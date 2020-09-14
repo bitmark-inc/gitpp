@@ -1,0 +1,45 @@
+{
+  "@context": {
+    "@version": 1.1,
+    "@protected": true,
+
+    "id": "@id",
+    "type": "@type",
+
+    "xsd": "http://www.w3.org/2001/XMLSchema#",
+
+    "git": "http://127.0.0.1/ocaps/bitmark.com/git/v1",
+
+    "repository": {
+      "@id": "http://127.0.0.1/ocaps/bitmark.com/git/v1#repository",
+      "@context": {
+        "@version": 1.1,
+        "@protected": true,
+
+        "id": "@id",
+        "type": "@type",
+
+        "repository": {"@id": "git:repository", "@type": "xsd:anyURI"}
+
+      }
+    },
+
+    "branchRegExp": {
+      "@id": "git:branchRegExp",
+      "@type": "xsd:string"
+    },
+
+    "branchCaveat": {
+      "@id": "git:branchCaveat",
+      "@context": [
+        {
+          "@version": 1.1,
+          "@protected": true,
+          "id": "@id",
+          "type": "@type"
+        },
+        "branchRegExp"
+      ]
+    }
+  }
+}

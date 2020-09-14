@@ -1,0 +1,7 @@
+{
+  "@context": "https://w3id.org/security/v2",
+  "id": "http://127.0.0.1/ocaps/carol/keys/1",
+  "type": "Ed25519VerificationKey2018",
+  "controller": "http://127.0.0.1/ocaps/carol/info",
+  "publicKeyBase58": "CXbgG2vPnd8FWLAZHoLRn3s7PRwehWsoMu6v1HhN9brA"
+}

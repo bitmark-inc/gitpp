@@ -1,0 +1,94 @@
+#!/bin/sh
+
+# This hook is called with the following parameters:
+#
+# $1 -- Name of the remote to which the push is being done
+# $2 -- URL to which the push is being done
+#
+# If pushing without using a named remote those arguments will be equal.
+#
+# Information about the commits which are being pushed is supplied as lines to
+# the standard input in the form:
+#
+#   <local ref> <local sha1> <remote ref> <remote sha1>
+#
+
+remote="${1}"
+url="${2}"
+
+# uncomment to enable
+# ===================
+#debug=yes
+verbose=yes
+# ===================
+
+if [ X"${verbose}" = X"yes" ]
+then
+  printf 'script: %s\n' "${0}"
+  printf 'remote: %s @ %s\n' "${remote}" "${url}"
+fi
+
+
+GetYorN() {
+  local yorn junk prompt
+
+  prompt="${1}"
+  while :
+  do
+    read -p "${prompt}: [Y/N]? " yorn junk < /dev/tty
+    case "${yorn}" in
+      ([yY]|[yY][eE][sS])
+        return 0
+        ;;
+      ([nN]|[nN][oO])
+        return 1
+        ;;
+      (*)
+        printf 'please answer yes or no\n'
+        ;;
+    esac
+  done
+  return 1
+}
+
+remote_refs=''
+
+while read local_ref local_sha remote_ref remote_sha
+do
+  if [ X"${verbose}" = X"yes" ]
+  then
+    printf 'local_ref: %s [SHA:%s]  remote_ref: %s [SHA:%s]\n' "${local_ref}" "${local_sha}" "${remote_ref}" "${remote_sha}"
+  fi
+  remote_refs="${remote_refs} ${remote_ref}"
+done
+
+[ X"${debug}" = X"yes" ] && set -x
+
+root_capability='http://127.0.0.1/ocaps/alice/caps/1'
+capability='http://127.0.0.1/ocaps/carol/caps/1'
+user_info='http://127.0.0.1/ocaps/carol/info'
+user_key='http://127.0.0.1/ocaps/carol/keys/1'
+invoke="node --trace-warnings @@JS_DIR@@/invoke.js"
+[ X"${verbose}" = X"yes" ] && invoke="${invoke} -v"
+[ X"${debug}" = X"yes" ] && invoke="${invoke} -v -v"
+
+if [ -z "${remote_refs}" ]
+then
+  printf 'nothing to push\n'
+  exit 0
+else
+  if ! ${invoke} \
+       --root-url="${root_capability}" \
+       --capability-url="${capability}" \
+       --user="${user_info}" \
+       --user-key="${user_key}" \
+       ${remote_refs}
+  then
+    printf 'push is forbidden\n'
+    exit 1
+  fi
+fi
+
+GetYorN 'manually reject push' && exit 1
+
+exit 0

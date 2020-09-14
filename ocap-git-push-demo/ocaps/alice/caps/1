@@ -1,0 +1,1 @@
+{"@context":"https://w3id.org/security/v2","id":"http://127.0.0.1/ocaps/alice/caps/1","invoker":"http://127.0.0.1/ocaps/alice/keys/1","delegator":"http://127.0.0.1/ocaps/alice/keys/1"}

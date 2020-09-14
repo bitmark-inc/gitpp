@@ -1,0 +1,13 @@
+{
+  "@context": "https://w3id.org/security/v2",
+
+  "id": "http://127.0.0.1/ocaps/carol/info",
+
+  "capabilityDelegation": [
+    "http://127.0.0.1/ocaps/carol/keys/2"
+  ],
+
+  "capabilityInvocation": [
+    "http://127.0.0.1/ocaps/carol/keys/1"
+  ]
+}
