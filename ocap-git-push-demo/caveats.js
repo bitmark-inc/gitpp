@@ -33,9 +33,6 @@ class BranchCaveat extends Caveat {
    */
   async validate(caveat) {
     try {
-      console.log('***1 caveat: ', JSON.stringify(caveat, null, 2));
-      console.log('***2 caveat: ', caveat);
-      console.log('***3 caveat: ', caveat['git:branchRegExp']);
       const regex = RegExp(caveat['git:branchRegExp']['@value']);
       if (!regex.test(this.branch)) {
         throw new Error('The capability is not allowed to write to this branch:', this.branch);
