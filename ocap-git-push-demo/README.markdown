@@ -38,7 +38,8 @@ make test
 
 Check invocation of delegated capability
 ~~~
-make test-1
+make test-1   # should show allowed: true
+make test-2   # should show allowed: false
 ~~~
 
 ## Check the push hook
