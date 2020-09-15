@@ -12,6 +12,9 @@ const { CapabilityInvocation, ExpirationCaveat } = ocapld;
 
 const { BranchCaveat } = require("./caveats");
 
+const theDocumentLoader = jsonld.documentLoaders.node();
+// or the XHR one: jsonld.documentLoaders.xhr()
+
 
 /**
  * Display usage message and exit
@@ -37,6 +40,95 @@ function usage(message) {
   process.exit(2);
 }
 
+
+
+/**
+* create a signed delegated capability invocation
+*
+* @param capabilityURL {string} URL to delegated capability
+*
+* @param keyPair {Ed25519KeyPair} key pair object
+*
+* @param userKey {string} URL that corresponds to public key in keyPair
+*        (Note: possible create a did:key:… from keyPair is this is null
+*
+* @param verbose {unsigned int} logging verbosity level (0 = no logging)
+*
+* @result {string} JSON encode signed capability invocation
+*
+*/
+async function signInvocation(capabilityURL, keyPair, userKey, verbose) {
+  const msg = {
+    '@context': SECURITY_CONTEXT_V2_URL,
+    id: capabilityURL,
+    nonce: (+new Date).toString(),
+  };
+  const invocation = await jsigs.sign(msg, {
+    suite: new Ed25519Signature2018({
+      creator: userKey,
+      key: keyPair
+    }),
+    purpose: new CapabilityInvocation({
+      capability: capabilityURL
+    }),
+    documentLoader: theDocumentLoader
+  });
+
+  if (verbose >= 1) {
+    console.log('1: invocation: ', JSON.stringify(invocation, null, 2));
+  }
+
+  // convert to compact JSON
+  const strInvocation = JSON.stringify(invocation);
+  return strInvocation;
+}
+
+/**
+* run an invocation
+*
+* @param strInvocation {string} a JSON encoded signed invocation
+*
+* @param rootCapabilityURL {string} URL of the root of the capability tree
+*
+* @param branches {list[string]} list of branches that are being pushed
+*
+* @param verbose {unsigned int} logging verbosity level (0 = no logging)
+*
+* @result false = invocation failed
+*         true  = invoked successfully
+*/
+async function runInvocation(strInvocation, rootCapabilityURL, branches, verbose) {
+
+  const invocation = JSON.parse(strInvocation);
+
+  let allowed = await branches.reduce(
+    async (acc, branch) => {
+
+      let result = await jsigs.verify(invocation, {
+        suite: new Ed25519Signature2018(),
+        purpose: new CapabilityInvocation({
+          expectedTarget: rootCapabilityURL,
+          suite: new Ed25519Signature2018(),
+          caveat: [new ExpirationCaveat(), new BranchCaveat({ branch: branch })],
+        }),
+        documentLoader: theDocumentLoader
+      });
+      if (verbose >= 1) {
+        console.log('1: push to branch "' + branch + '" allowed?', result.verified);
+      }
+
+      if (verbose >= 2) {
+        console.log('2: result: ', JSON.stringify(result, null, 2));
+      }
+
+      if (!result.verified) {
+        console.log('push to branch "' + branch + '" is forbidden');
+      }
+
+      return result.verified && acc;
+    }, Promise.resolve(true));
+  return allowed;
+}
 
 /**
  * main program
@@ -93,8 +185,8 @@ function usage(message) {
   }
 
   if (verbose >= 3) {
-    console.log('args: ', process.argv);
-    console.log('optind: ', parser.optind());
+    console.log('3: args: ', process.argv);
+    console.log('3: optind: ', parser.optind());
   }
 
   // strip script name and already processed options from command arguments
@@ -118,64 +210,30 @@ function usage(message) {
   }
 
   if (verbose >= 3) {
-    console.log('args: ', commandArguments);
+    console.log('3: args: ', commandArguments);
   }
 
-  const myPk = {
-    "publicKeyBase58": "CXbgG2vPnd8FWLAZHoLRn3s7PRwehWsoMu6v1HhN9brA",
-    "privateKeyBase58": "3LftyxxRPxMFXwVChk14HDybE2VnBnPWaLX31WreZwc8V8xCCuoGL7dcyxnwkFXa8D7CZBwAGWj54yqoaxa7gUne"
-  };
+  // simulate signing occuring in another process
+  // and just returning a JSON signed value
+  // by isolating the siging in a closure
+  const strInvocation = await (() => {
+    const myPk = {
+      "publicKeyBase58": "CXbgG2vPnd8FWLAZHoLRn3s7PRwehWsoMu6v1HhN9brA",
+      "privateKeyBase58": "3LftyxxRPxMFXwVChk14HDybE2VnBnPWaLX31WreZwc8V8xCCuoGL7dcyxnwkFXa8D7CZBwAGWj54yqoaxa7gUne"
+    };
 
-  const loader = jsonld.documentLoaders.node();
-  // or the XHR one: jsonld.documentLoaders.xhr()
+    const myKeyPair = new Ed25519KeyPair(myPk);
+    return signInvocation(capabilityURL, myKeyPair, userKey, verbose);
+  })();
 
-  // invoke the delegated capability
-  const msg = {
-    '@context': SECURITY_CONTEXT_V2_URL,
-    id: capabilityURL, //'urn:uuid:cab83279-c695-4e66-9458-4327de49197a',
-    nonce: (+new Date).toString(),
-  };
-  const invocation = await jsigs.sign(msg, {
-    suite: new Ed25519Signature2018({
-      creator: userKey,
-      key: new Ed25519KeyPair(myPk)
-    }),
-    purpose: new CapabilityInvocation({
-      capability: capabilityURL
-    }),
-    documentLoader: loader
-  });
-
-  if (verbose >= 1) {
-    console.log('invocation: ', JSON.stringify(invocation, null, 2));
+  // ensure string is the only type passed
+  if ('string' !== typeof(strInvocation)) {
+    console.log('type of strInvocation: actual:', typeof(strInvocation), ' expected: string');
+    process.exit(1);
   }
 
-  let allowed = await commandArguments.reduce(
-    async (acc, branch) => {
-
-      let result = await jsigs.verify(invocation, {
-        suite: new Ed25519Signature2018(),
-        purpose: new CapabilityInvocation({
-          expectedTarget: rootCapabilityURL,
-          suite: new Ed25519Signature2018(),
-          caveat: [new ExpirationCaveat(), new BranchCaveat({ branch: branch })],
-        }),
-        documentLoader: loader
-      });
-      if (verbose >= 1) {
-        console.log('push to branch "' + branch + '" allowed?', result.verified);
-      }
-
-      if (verbose >= 2) {
-        console.log('result: ', JSON.stringify(result, null, 2));
-      }
-
-      if (!result.verified) {
-        console.log('push to branch "' + branch + '" is forbidden');
-      }
-
-      return result.verified && acc;
-    }, Promise.resolve(true));
+  // invoke capability
+  const allowed = await runInvocation(strInvocation, rootCapabilityURL, commandArguments, verbose);
 
   process.exit(allowed ? 0 : 1);
 })();
