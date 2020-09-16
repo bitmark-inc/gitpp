@@ -16,10 +16,27 @@ USER_DID = "did:key:z6MkqyrirHAq8Acicq1FyNJGd9R7D1DW7Q8A3v1qqZfP4pdY"
 # all public keys for pub-to-did make target
 PUBLIC_KEYS = ${ISSUER_PUB} ${USER_PUB}
 
+# default URL is this repository
+GIT_URL ?= git@github.com:bitmark-inc/gitpp.git
+
+# default branches are used for test target below
+#
+# examples:
+#
+#   really commit to master:
+#       make create-capability BRANCH_RE='^refs/heads/master$'
+#
+#   commit to a user home dir test-repo with a file clone
+#       make create-capability GIT_URL="/home/${USER}/test-repo" BRANCH_RE='^refs/heads/master$'
+#
+# Notes:
+#   1. single quote to avoid shell problem with $
+#   2. no need for $$ as in line below ($$ is only Makefile internal)
+BRANCH_RE ?= ^refs/heads/(feature/trial|main)$$
+
 
 CAPABILITY_URL = 'cap:one.cap'
-CAPABILITY_TARGET = 'ssh://git@github.com:some-account/some-repo?key=z6MkvRsV39xVQc8HevAQwCqEw18DwrEtzVLz8NJY15NtfMmD'
-#CAPABILITY_TARGET = 'http://127.0.0.1/ocaps/alice/caps/1'
+CAPABILITY_TARGET = 'ssh://${GIT_URL}?key=z6MkvRsV39xVQc8HevAQwCqEw18DwrEtzVLz8NJY15NtfMmD'
 
 # update js dependencies
 .PHONY: all
@@ -39,7 +56,7 @@ create-capability:
 	  --capability-file='ocaps/one.cap' \
 	  --capability-url=${CAPABILITY_URL} \
 	  --target=${CAPABILITY_TARGET} \
-	  --branch-re='^refs/heads/(feature/trial|main)$$'
+	  --branch-re="${BRANCH_RE}"
 
 
 # convert the list of public keys to dids and show their did:key:xxx values

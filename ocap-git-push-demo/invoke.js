@@ -92,9 +92,14 @@ async function runInvocation(invocation, target, branches, verbose) {
         } else if (verbose >= 1){
 
           result.results.forEach( (result) => {
-            result.error.errors.forEach( (error) => {
-              debug('1: verify error:', error.message);
-            });
+            if (undefined !== result.error) {
+              debug('1: result error:', result.error.message);
+              if (undefined !== result.error.errors) {
+                result.error.errors.forEach( (error) => {
+                  debug('1: verify error:', error.message);
+                });
+              }
+            }
           });
         }
         debug('push to branch: "' + branch + '" is forbidden');
