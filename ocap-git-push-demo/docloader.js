@@ -15,6 +15,11 @@ const jsonldLoader = jsonld.documentLoaders.node();
 // or the XHR one: jsonld.documentLoaders.xhr()
 
 
+const path = require('path');
+
+const filestorePath = path.join(process.mainModule.path, 'ocaps');
+
+
 /**
  * Debug message to stderr so as not to interferewith stdout pipe
  *
@@ -36,7 +41,7 @@ function debug(...args) {
 async function documentLoader(url) {
 
   if (0 == url.indexOf('https://bitmark.com/git/v1')) {
-    const s = fs.readFileSync('ocaps/bitmark.com/git/v1', 'utf8');
+    const s = fs.readFileSync(path.join(filestorePath, '/bitmark.com/git/v1'), 'utf8');
     return {
       contextUrl: null,
       url: url,
@@ -47,7 +52,7 @@ async function documentLoader(url) {
   if (0 == url.indexOf('cap:')) {
     debug('url==cap:', url);
     let fileName = url.substring(4, url.length);
-    const s = fs.readFileSync(fileName, 'utf8');
+    const s = fs.readFileSync(path.join(filestorePath, fileName), 'utf8');
     return {
       contextUrl: null,
       url: url,

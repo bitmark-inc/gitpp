@@ -36,7 +36,7 @@ create-capability:
 	  --issuer-key=0 \
 	  --user=${USER_DID} \
 	  --user-key=0 \
-	  --capability-file='one.cap' \
+	  --capability-file='ocaps/one.cap' \
 	  --capability-url=${CAPABILITY_URL} \
 	  --target=${CAPABILITY_TARGET} \
 	  --branch-re='^refs/heads/(feature/trial|main)$$'

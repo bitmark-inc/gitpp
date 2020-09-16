@@ -64,24 +64,50 @@ done
 
 [ X"${debug}" = X"yes" ] && set -x
 
-root_capability='http://127.0.0.1/ocaps/alice/caps/1'
-capability='http://127.0.0.1/ocaps/carol/caps/1'
-user_info='http://127.0.0.1/ocaps/carol/info'
-user_key='http://127.0.0.1/ocaps/carol/keys/1'
+
+CAPABILITY_URL='cap:one.cap'
+CAPABILITY_TARGET='ssh://git@github.com:some-account/some-repo?key=z6MkvRsV39xVQc8HevAQwCqEw18DwrEtzVLz8NJY15NtfMmD'
+
+sign="node --trace-warnings @@JS_DIR@@/sign-invocation.js"
 invoke="node --trace-warnings @@JS_DIR@@/invoke.js"
-[ X"${verbose}" = X"yes" ] && invoke="${invoke} -v"
-[ X"${debug}" = X"yes" ] && invoke="${invoke} -v -v"
+
+[ X"${verbose}" = X"yes" ] && sign="${sign} -v" && invoke="${invoke} -v"
+[ X"${debug}" = X"yes" ] && sign="${sign} -v -v" && invoke="${invoke} -v -v"
+
+
+rm -f tmp-signed-invocation
+
+cleanup() {
+  rm -f tmp-signed-invocation
+}
+trap cleanup INT EXIT
+
+# simulate secure enclave
+sign_invocation() {
+
+  # user: secret key, public key, and did:key from public key
+  local USER_SEC='3LftyxxRPxMFXwVChk14HDybE2VnBnPWaLX31WreZwc8V8xCCuoGL7dcyxnwkFXa8D7CZBwAGWj54yqoaxa7gUne'
+  local USER_PUB='CXbgG2vPnd8FWLAZHoLRn3s7PRwehWsoMu6v1HhN9brA'
+  local USER_DID='did:key:z6MkqyrirHAq8Acicq1FyNJGd9R7D1DW7Q8A3v1qqZfP4pdY'
+
+  ${sign} \
+    --capability-url=${CAPABILITY_URL} \
+    --target=${CAPABILITY_TARGET} \
+    --user=${USER_DID} \
+    --user-sec=${USER_SEC} \
+    --user-key=0 > tmp-signed-invocation
+}
 
 if [ -z "${remote_refs}" ]
 then
   printf 'nothing to push\n'
   exit 0
 else
-  if ! ${invoke} \
-       --root-url="${root_capability}" \
-       --capability-url="${capability}" \
-       --user="${user_info}" \
-       --user-key="${user_key}" \
+
+  sign_invocation
+
+  if ! ${invoke} < tmp-signed-invocation \
+       --target=${CAPABILITY_TARGET} \
        ${remote_refs}
   then
     printf 'push is forbidden\n'
