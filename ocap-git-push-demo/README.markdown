@@ -1,25 +1,5 @@
 # Simple test of a pre-push hook
 
-## Set up local web server
-
-For nginx you need to be able to alias /ocaps to the ocaps directory
-
-e.g.:
-
-~~~
-    location /ocaps {
-        alias /PATH/TO/THIS/DIR/ocaps;
-        access_log off;
-        log_not_found off;
-        autoindex on;
-    }
-~~~
-
-To test that nginx is configured correctly:
-~~~
-curl http://127.0.0.1/ocaps/bitmark/git/v1 | jq .
-~~~
-
 ## Test the delecation and invocation
 
 Install the dependencies
