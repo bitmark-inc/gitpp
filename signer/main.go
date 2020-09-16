@@ -61,10 +61,6 @@ func authenticate(c *cli.Context) error {
 	return nil
 }
 
-// The enclave manager should manage keypairs, and select
-// the corresponding private key to invoke the required capability.
-// For example, a map of did to private key will suffice.
-// Here we
 func invokeCapability(c *cli.Context) error {
 	privateKey, err := base58.Decode(c.GlobalString("pvtkey"))
 	if err != nil {
@@ -102,7 +98,7 @@ func invokeCapability(c *cli.Context) error {
 		"type":               ProofTypeEd25519Signature2018,
 		"created":            time.Now().Format(time.RFC3339),
 		"verificationMethod": getKeyID(capability.Invoker),
-		"proofPurpose":       "capabilityIncovation",
+		"proofPurpose":       "capabilityInvocation",
 		"capability":         capability.ID,
 	}
 	sign(msg, proof, signingKey, time.Now())

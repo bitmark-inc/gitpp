@@ -69,7 +69,7 @@ Submit the following LD-Proof to the pre-push hook script:
         "capability": "urn:uuid:7001024f-cefd-4ba1-9992-2fa30c379a9a",
         "created": "2020-09-16T14:27:48+08:00",
         "jws": "eyJhbGciOiJFZERTQSIsImI2NCI6ZmFsc2UsImNyaXQiOlsiYjY0Il19..7-bWGiGuvlMg25ISmRk5CBVLOBh1zplpG0HHAho4ZcKNiBUldg6wgOOZlOaXcGidMYQplcMFAB-qmy9_AkzeDg",
-        "proofPurpose": "capabilityIncovation",
+        "proofPurpose": "capabilityInvocation",
         "type": "Ed25519Signature2018",
         "verificationMethod": "did:key:z6MkkXj64H78H9ADPfWop96H9N9qT7LB3w5TazgrBJ6DX6nf#z6MkkXj64H78H9ADPfWop96H9N9qT7LB3w5TazgrBJ6DX6nf"
     }
