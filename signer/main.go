@@ -51,11 +51,12 @@ func authenticate(c *cli.Context) error {
 	}
 	sign(msg, proof, signingKey, time.Now())
 
-	data, err := json.MarshalIndent(msg, "", "    ")
+	didDoc, _ := json.MarshalIndent(generateDIDDocument(privateKey), "", "    ")
+	didProof, err := json.MarshalIndent(msg, "", "    ")
 	if err != nil {
 		return err
 	}
-	fmt.Printf("\n\nSubmit the following LD-Proof to the capability manager:\n%s\n", data)
+	fmt.Printf("\nSubmit the following LD-Proof to the capability manager:\nDID Document\n%s\n\nDID Signature\n%s\n", didDoc, didProof)
 
 	return nil
 }
@@ -125,6 +126,39 @@ func getKeyID(did string) string {
 	parts := strings.Split(did, ":")
 	keyID := fmt.Sprintf("%s#%s", did, parts[2])
 	return keyID
+}
+
+func generateDIDDocument(privateKey ed25519.PrivateKey) map[string]interface{} {
+	publicKey := privateKey.Public().(ed25519.PublicKey)
+	did := getDID(publicKey)
+	keyID := getKeyID(did)
+
+	return map[string]interface{}{
+		"@context": []string{
+			SecurityContextV2URL,
+		},
+		"id": did,
+		"publicKey": []map[string]interface{}{
+			{
+				"id":              keyID,
+				"type":            "Ed25519VerificationKey2018",
+				"controller":      did,
+				"publicKeyBase58": base58.Encode(publicKey),
+			},
+		},
+		"authentication":       []string{keyID},
+		"assertionMethod":      []string{keyID},
+		"capabilityDelegation": []string{keyID},
+		"capabilityInvocation": []string{keyID},
+		// "keyAgreement": [
+		//   {
+		// 	"id": "did:key:z6MkkXj64H78H9ADPfWop96H9N9qT7LB3w5TazgrBJ6DX6nf#z6LSfnMsbKAAbPBfSSxPbeuTaSNWKwA9DrQkm4FrsCeupFfr",
+		// 	"type": "X25519KeyAgreementKey2019",
+		// 	"controller": "did:key:z6MkkXj64H78H9ADPfWop96H9N9qT7LB3w5TazgrBJ6DX6nf",
+		// 	"publicKeyBase58": "57Bi51MJVvTvM4ad51PWFrA2Und2XFEbt5YBNk1P6su6"
+		//   }
+		// ]
+	}
 }
 
 func sign(doc, proof map[string]interface{}, signingKey jose.SigningKey, now time.Time) error {
