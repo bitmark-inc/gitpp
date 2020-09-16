@@ -207,8 +207,8 @@ function usage(message) {
   const capability = {
     '@context': [
       SECURITY_CONTEXT_URL,
-      'http://127.0.0.1/ocaps/bitmark.com/git/v1',
-      { git: 'http://127.0.0.1/ocaps/bitmark.com/git/v1' },
+      'https://bitmark.com/git/v1',
+      { git: 'https://bitmark.com/git/v1' },
     ],
     id: capabilityURL,
     //parentCapability: 'http://127.0.0.1/ocaps/alice/caps/1',

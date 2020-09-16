@@ -35,6 +35,15 @@ function debug(...args) {
  */
 async function documentLoader(url) {
 
+  if (0 == url.indexOf('https://bitmark.com/git/v1')) {
+    const s = fs.readFileSync('ocaps/bitmark.com/git/v1', 'utf8');
+    return {
+      contextUrl: null,
+      url: url,
+      document: JSON.parse(s)
+    };
+  }
+
   if (0 == url.indexOf('cap:')) {
     debug('url==cap:', url);
     let fileName = url.substring(4, url.length);
