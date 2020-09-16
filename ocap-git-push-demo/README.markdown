@@ -17,7 +17,7 @@ e.g.:
 
 To test that nginx is configured correctly:
 ~~~
-curl http://127.0.0.1/ocaps/alice/info | jq .
+curl http://127.0.0.1/ocaps/bitmark/git/v1 | jq .
 ~~~
 
 ## Test the delecation and invocation
@@ -31,15 +31,17 @@ make                        # just runs yarn
 
 Run tests (using BSD or GNU make)
 
-Rebuild root and delegated capabilities:
+Build capability:
 ~~~
-make test
+make create-capability
 ~~~
 
 Check invocation of delegated capability
 ~~~
 make test-1   # should show allowed: true
 make test-2   # should show allowed: false
+              # OR:
+make test     # run both tests
 ~~~
 
 ## Check the push hook

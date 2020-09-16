@@ -1,7 +1,0 @@
-{
-  "@context": "https://w3id.org/security/v2",
-  "id": "http://127.0.0.1/ocaps/alice/keys/1",
-  "type": "Ed25519VerificationKey2018",
-  "controller": "http://127.0.0.1/ocaps/alice/info",
-  "publicKeyBase58": "GycSSui454dpYRKiFdsQ5uaE8Gy3ac6dSMPcAoQsk8yq"
-}

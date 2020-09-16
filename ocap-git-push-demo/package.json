@@ -9,6 +9,8 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "did-io": "^0.8.0",
+    "did-method-key": "^0.6.0",
     "jsonld-signatures": "git://github.com/digitalbazaar/jsonld-signatures.git#v5.1.0",
     "ocapld": "git://github.com/digitalbazaar/ocapld.js.git#v2.0.0",
     "posix-getopt": "^1.2.0"

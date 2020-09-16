@@ -1,5 +1,7 @@
 'use strict';
 
+const fs = require('fs');
+
 const jsonld = require('jsonld');
 const { KeyPairOptions } = require('crypto-ld');
 
@@ -11,10 +13,19 @@ const ocapld = require('ocapld');
 const { CapabilityInvocation, ExpirationCaveat } = ocapld;
 
 const { BranchCaveat } = require("./caveats");
+const { documentLoader } = require("./docloader");
 
-const theDocumentLoader = jsonld.documentLoaders.node();
-// or the XHR one: jsonld.documentLoaders.xhr()
 
+/**
+ * Debug message to stderr so as not to interferewith stdout pipe
+ *
+ * @param message - optional error message
+ *
+ * @return terminates the program
+ */
+function debug(...args) {
+  console.error('invoke:', ...args);
+}
 
 /**
  * Display usage message and exit
@@ -32,63 +43,18 @@ function usage(message) {
 
   console.error('       --help             -h            this message');
   console.error('       --verbose          -v            more messages');
-  console.error('       --user=URL         -u URL        set the user name');
-  console.error('       --user-key=URL     -k URL        set the user name');
   console.error('       --capability=URL   -c URL        set the delegated capability');
-  console.error('       --root=URL         -r URL        set the root capability');
+  console.error('       --target=URL       -t URL        target of the capability');
 
   process.exit(2);
-}
-
-
-
-/**
-* create a signed delegated capability invocation
-*
-* @param capabilityURL {string} URL to delegated capability
-*
-* @param keyPair {Ed25519KeyPair} key pair object
-*
-* @param userKey {string} URL that corresponds to public key in keyPair
-*        (Note: possible create a did:key:… from keyPair is this is null
-*
-* @param verbose {unsigned int} logging verbosity level (0 = no logging)
-*
-* @result {string} JSON encode signed capability invocation
-*
-*/
-async function signInvocation(capabilityURL, keyPair, userKey, verbose) {
-  const msg = {
-    '@context': SECURITY_CONTEXT_V2_URL,
-    id: capabilityURL,
-    nonce: (+new Date).toString(),
-  };
-  const invocation = await jsigs.sign(msg, {
-    suite: new Ed25519Signature2018({
-      creator: userKey,
-      key: keyPair
-    }),
-    purpose: new CapabilityInvocation({
-      capability: capabilityURL
-    }),
-    documentLoader: theDocumentLoader
-  });
-
-  if (verbose >= 1) {
-    console.log('1: invocation: ', JSON.stringify(invocation, null, 2));
-  }
-
-  // convert to compact JSON
-  const strInvocation = JSON.stringify(invocation);
-  return strInvocation;
 }
 
 /**
 * run an invocation
 *
-* @param strInvocation {string} a JSON encoded signed invocation
+* @param invocation {object} a JSON encoded signed invocation
 *
-* @param rootCapabilityURL {string} URL of the root of the capability tree
+* @param target {string} target of the capability tree
 *
 * @param branches {list[string]} list of branches that are being pushed
 *
@@ -97,9 +63,7 @@ async function signInvocation(capabilityURL, keyPair, userKey, verbose) {
 * @result false = invocation failed
 *         true  = invoked successfully
 */
-async function runInvocation(strInvocation, rootCapabilityURL, branches, verbose) {
-
-  const invocation = JSON.parse(strInvocation);
+async function runInvocation(invocation, target, branches, verbose) {
 
   let allowed = await branches.reduce(
     async (acc, branch) => {
@@ -107,22 +71,33 @@ async function runInvocation(strInvocation, rootCapabilityURL, branches, verbose
       let result = await jsigs.verify(invocation, {
         suite: new Ed25519Signature2018(),
         purpose: new CapabilityInvocation({
-          expectedTarget: rootCapabilityURL,
+          expectedTarget: target,
           suite: new Ed25519Signature2018(),
           caveat: [new ExpirationCaveat(), new BranchCaveat({ branch: branch })],
         }),
-        documentLoader: theDocumentLoader
+        documentLoader: documentLoader
       });
       if (verbose >= 1) {
-        console.log('1: push to branch "' + branch + '" allowed?', result.verified);
+        debug('1: push to branch "' + branch + '" allowed?', result.verified);
       }
 
       if (verbose >= 2) {
-        console.log('2: result: ', JSON.stringify(result, null, 2));
+        debug('2: result:', JSON.stringify(result, null, 2));
       }
 
       if (!result.verified) {
-        console.log('push to branch "' + branch + '" is forbidden');
+        if (verbose >= 2) {
+          // decode to JSON to be able to see the individual errors
+          debug('2: result:', JSON.stringify(result, null, 2));
+        } else if (verbose >= 1){
+
+          result.results.forEach( (result) => {
+            result.error.errors.forEach( (error) => {
+              debug('1: verify error:', error.message);
+            });
+          });
+        }
+        debug('push to branch: "' + branch + '" is forbidden');
       }
 
       return result.verified && acc;
@@ -141,18 +116,14 @@ async function runInvocation(strInvocation, rootCapabilityURL, branches, verbose
  */
 (async function main() {
 
-
   const mod_getopt = require('posix-getopt');
 
   let verbose = 0;
-  let userURL = '';
-  let userKey = '';
-  let capabilityURL = '';
-  let rootCapabilityURL = '';
+  let target = '';
 
   let parser = new mod_getopt.BasicParser('h(help)' +
-                                          'c:(capability-url)r:(root-url)' +
-                                          'u:(user)k:(user-key)v(verbose)', process.argv);
+                                          't:(target)' +
+                                          'v(verbose)', process.argv);
   let option;
   while ((option = parser.getopt()) !== undefined) {
     switch (option.option) {
@@ -160,20 +131,8 @@ async function runInvocation(strInvocation, rootCapabilityURL, branches, verbose
       verbose += 1;
       break;
 
-    case 'c':
-      capabilityURL = option.optarg;
-      break;
-
-    case 'r':
-      rootCapabilityURL = option.optarg;
-      break;
-
-    case 'u':
-      userURL = option.optarg;
-      break;
-
-    case 'k':
-      userKey = option.optarg;
+    case 't':
+      target = option.optarg;
       break;
 
     case 'h':
@@ -185,8 +144,8 @@ async function runInvocation(strInvocation, rootCapabilityURL, branches, verbose
   }
 
   if (verbose >= 3) {
-    console.log('3: args: ', process.argv);
-    console.log('3: optind: ', parser.optind());
+    debug('3: args:', process.argv);
+    debug('3: optind:', parser.optind());
   }
 
   // strip script name and already processed options from command arguments
@@ -196,44 +155,32 @@ async function runInvocation(strInvocation, rootCapabilityURL, branches, verbose
     usage('missing required branch argument(s)');
   }
 
-  if (0 == userURL.length) {
-    usage('missing user URL');
-  }
-  if (0 == userKey.length) {
-    usage('missing user key');
-  }
-  if (0 == rootCapabilityURL.length) {
-    usage('missing root capability URL');
-  }
-  if (0 == capabilityURL.length) {
-    usage('missing delegated capability URL');
+  if (0 == target.length) {
+    usage('missing capability target');
   }
 
   if (verbose >= 3) {
-    console.log('3: args: ', commandArguments);
+    debug('3: args:', commandArguments);
   }
 
-  // simulate signing occuring in another process
-  // and just returning a JSON signed value
-  // by isolating the siging in a closure
-  const strInvocation = await (() => {
-    const myPk = {
-      "publicKeyBase58": "CXbgG2vPnd8FWLAZHoLRn3s7PRwehWsoMu6v1HhN9brA",
-      "privateKeyBase58": "3LftyxxRPxMFXwVChk14HDybE2VnBnPWaLX31WreZwc8V8xCCuoGL7dcyxnwkFXa8D7CZBwAGWj54yqoaxa7gUne"
-    };
+  // get JSON signed invocation from stdin
+  // let strInvocation = '';
+  // fs.readFile(process.stdin.fd, 'utf8', (err, data) => {
+  //   if (err) {
+  //     throw err;
+  //   }
+  //   debug('data:', data);
+  //   strInvocation += data;
+  // });
+  let strInvocation = fs.readFileSync(process.stdin.fd, 'utf8');
 
-    const myKeyPair = new Ed25519KeyPair(myPk);
-    return signInvocation(capabilityURL, myKeyPair, userKey, verbose);
-  })();
+  const invocation = JSON.parse(strInvocation);
 
-  // ensure string is the only type passed
-  if ('string' !== typeof(strInvocation)) {
-    console.log('type of strInvocation: actual:', typeof(strInvocation), ' expected: string');
-    process.exit(1);
-  }
+  // remaining arguments are the list of branches that are being committed
+  const branches = commandArguments;
 
   // invoke capability
-  const allowed = await runInvocation(strInvocation, rootCapabilityURL, commandArguments, verbose);
+  const allowed = await runInvocation(invocation, target, branches, verbose);
 
   process.exit(allowed ? 0 : 1);
 })();

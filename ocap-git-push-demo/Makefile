@@ -1,28 +1,71 @@
 # BSDmakefile
 
+VERBOSE ?=
+
+# issuer: secret key, public key, and did:key from public key
+ISSUER_SEC = "3Mmk4UzTRJTEtxaKk61LxtgUxAa2Dg36jF6VogPtRiKvfpsQWKPCLesKSV182RMmvMJKk6QErH3wgdHp8itkSSiF"
+ISSUER_PUB = "GycSSui454dpYRKiFdsQ5uaE8Gy3ac6dSMPcAoQsk8yq"
+ISSUER_DID = "did:key:z6MkvRsV39xVQc8HevAQwCqEw18DwrEtzVLz8NJY15NtfMmD"
+
+# user: secret key, public key, and did:key from public key
+USER_SEC = "3LftyxxRPxMFXwVChk14HDybE2VnBnPWaLX31WreZwc8V8xCCuoGL7dcyxnwkFXa8D7CZBwAGWj54yqoaxa7gUne"
+USER_PUB = "CXbgG2vPnd8FWLAZHoLRn3s7PRwehWsoMu6v1HhN9brA"
+USER_DID = "did:key:z6MkqyrirHAq8Acicq1FyNJGd9R7D1DW7Q8A3v1qqZfP4pdY"
+
+
+# all public keys for pub-to-did make target
+PUBLIC_KEYS = ${ISSUER_PUB} ${USER_PUB}
+
+
+CAPABILITY_URL = 'cap:one.cap'
+CAPABILITY_TARGET = 'ssh://git@github.com:some-account/some-repo?key=z6MkvRsV39xVQc8HevAQwCqEw18DwrEtzVLz8NJY15NtfMmD'
+#CAPABILITY_TARGET = 'http://127.0.0.1/ocaps/alice/caps/1'
+
+# update js dependencies
 .PHONY: all
 all:
 	yarn
 
-.PHONY: test
-test:
-	node --trace-warnings delegate.js -v \
-	  --issuer-key='http://127.0.0.1/ocaps/alice/keys/1' \
-	  --root-file='ocaps/alice/caps/1' \
-	  --root-url='http://127.0.0.1/ocaps/alice/caps/1' \
-	  --user='http://127.0.0.1/ocaps/carol/info' \
-	  --user-key='http://127.0.0.1/ocaps/carol/info' \
-	  --capability-file='ocaps/carol/caps/1' \
-	  --capability-url='http://127.0.0.1/ocaps/carol/caps/1' \
+
+# create a demo capability
+.PHONY: create-capability
+create-capability:
+	node --trace-warnings create-capability.js ${VERBOSE} \
+	  --issuer=${ISSUER_DID} \
+	  --issuer-sec=${ISSUER_SEC} \
+	  --issuer-key=0 \
+	  --user=${USER_DID} \
+	  --user-key=0 \
+	  --capability-file='one.cap' \
+	  --capability-url=${CAPABILITY_URL} \
+	  --target=${CAPABILITY_TARGET} \
 	  --branch-re='^refs/heads/(feature/trial|main)$$'
 
+
+# convert the list of public keys to dids and show their did:key:xxx values
+.PHONY: pub-to-did
+pub-to-did:
+	node --trace-warnings getdid.js ${VERBOSE} ${PUBLIC_KEYS}
+
+
+# run all tests
+.PHONY: test
+test: test-1 test-2
+
+
+# test that allows access
 .PHONY: test-1
 test-1:
-	if node --trace-warnings invoke.js -v \
-	  --root-url='http://127.0.0.1/ocaps/alice/caps/1' \
-	  --capability-url='http://127.0.0.1/ocaps/carol/caps/1' \
-	  --user='http://127.0.0.1/ocaps/carol/info' \
-	  --user-key='http://127.0.0.1/ocaps/carol/keys/1' \
+	rm -f tmp-signed-invocation
+	node --trace-warnings sign-invocation.js ${VERBOSE} \
+	  --capability-url=${CAPABILITY_URL} \
+	  --target=${CAPABILITY_TARGET} \
+	  --user=${USER_DID} \
+	  --user-sec=${USER_SEC} \
+	  --user-key=0 > tmp-signed-invocation
+
+	if node < tmp-signed-invocation --trace-warnings invoke.js ${VERBOSE} \
+	  --target=${CAPABILITY_TARGET} \
 	  refs/heads/feature/trial ; \
 	rc="$${?}"; actual=0; \
 	printf '\nexit status: actual: %d  expected: %d\n\n' "$${rc}" "$${actual}" ; \
@@ -30,13 +73,19 @@ test-1:
 	then exit 0 ; else exit 1 ; fi
 
 
+# test that disallows access
 .PHONY: test-2
 test-2:
-	if node --trace-warnings invoke.js -v \
-	  --root-url='http://127.0.0.1/ocaps/alice/caps/1' \
-	  --capability-url='http://127.0.0.1/ocaps/carol/caps/1' \
-	  --user='http://127.0.0.1/ocaps/carol/info' \
-	  --user-key='http://127.0.0.1/ocaps/carol/keys/1' \
+	rm -f tmp-signed-invocation
+	node --trace-warnings sign-invocation.js ${VERBOSE} \
+	  --capability-url=${CAPABILITY_URL} \
+	  --target=${CAPABILITY_TARGET} \
+	  --user=${USER_DID} \
+	  --user-sec=${USER_SEC} \
+	  --user-key=0 > tmp-signed-invocation
+
+	if node < tmp-signed-invocation --trace-warnings invoke.js ${VERBOSE} \
+	  --target=${CAPABILITY_TARGET} \
 	  refs/heads/master ; \
 	rc="$${?}"; actual=1; \
 	printf '\nexit status: actual: %d  expected: %d\n\n' "$${rc}" "$${actual}" ; \
