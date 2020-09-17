@@ -68,7 +68,7 @@ pub-to-did:
 
 # run all tests
 .PHONY: test
-test: test-1 test-2
+test: create-capability test-1 test-2
 
 
 # test that allows access

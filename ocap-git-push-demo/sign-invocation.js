@@ -12,6 +12,8 @@ const { Ed25519Signature2018 } = suites;
 const ocapld = require('ocapld');
 const { CapabilityInvocation } = ocapld;
 
+const uuidv4 = require('uuid/v4');
+
 const { documentLoader } = require("./docloader");
 
 
@@ -72,10 +74,16 @@ function usage(message) {
 */
 async function signInvocation(capabilityURL, target, keyPair, userKey, verbose) {
 
+  const nonce = (+new Date).toString();
+
+  const id = 'invoke:push:' + uuidv4();
+
   const msg = {
     '@context': SECURITY_CONTEXT_V2_URL,
-    id: capabilityURL,
-    nonce: (+new Date).toString(),
+    id: id,
+    capabilityInvocation: capabilityURL,
+    invocationTarget: target,
+    nonce: nonce
   };
   const invocation = await jsigs.sign(msg, {
     suite: new Ed25519Signature2018({

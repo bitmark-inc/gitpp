@@ -65,10 +65,6 @@ done
 [ X"${debug}" = X"yes" ] && set -x
 
 
-ISSUER_DID='did:key:z6MkvRsV39xVQc8HevAQwCqEw18DwrEtzVLz8NJY15NtfMmD'
-CAPABILITY_URL='cap:one.cap'
-CAPABILITY_TARGET="ssh://${url}?key=${ISSUER_DID}"
-
 sign="node --trace-warnings @@JS_DIR@@/sign-invocation.js"
 invoke="node --trace-warnings @@JS_DIR@@/invoke.js"
 
@@ -86,17 +82,23 @@ trap cleanup INT EXIT
 # simulate secure enclave
 sign_invocation() {
 
-  # user: secret key, public key, and did:key from public key
+  # user: secret key, public key, and did:key from public key and keyId(always 0 for did:key:)
   local USER_SEC='3LftyxxRPxMFXwVChk14HDybE2VnBnPWaLX31WreZwc8V8xCCuoGL7dcyxnwkFXa8D7CZBwAGWj54yqoaxa7gUne'
   local USER_PUB='CXbgG2vPnd8FWLAZHoLRn3s7PRwehWsoMu6v1HhN9brA'
   local USER_DID='did:key:z6MkqyrirHAq8Acicq1FyNJGd9R7D1DW7Q8A3v1qqZfP4pdY'
+  local USER_KID=0
+
+  local ISSUER_DID='did:key:z6MkvRsV39xVQc8HevAQwCqEw18DwrEtzVLz8NJY15NtfMmD'
+  local CAPABILITY_TARGET="ssh://${url}?key=${ISSUER_DID}"
+
+  local CAPABILITY_URL='cap:one.cap'
 
   ${sign} \
-    --capability-url=${CAPABILITY_URL} \
-    --target=${CAPABILITY_TARGET} \
-    --user=${USER_DID} \
-    --user-sec=${USER_SEC} \
-    --user-key=0 > tmp-signed-invocation
+    --capability-url="${CAPABILITY_URL}" \
+    --target="${CAPABILITY_TARGET}" \
+    --user="${USER_DID"} \
+    --user-sec="${USER_SEC}" \
+    --user-key="${USER_KID}" > tmp-signed-invocation
 }
 
 if [ -z "${remote_refs}" ]
@@ -105,10 +107,12 @@ then
   exit 0
 else
 
-  sign_invocation
+  sign_invocation "${url}"
+
+  target="$(jq .invocationTarget tmp-signed-invocation)"
 
   if ! ${invoke} < tmp-signed-invocation \
-       --target=${CAPABILITY_TARGET} \
+       --target="${target}" \
        ${remote_refs}
   then
     printf 'push is forbidden\n'
