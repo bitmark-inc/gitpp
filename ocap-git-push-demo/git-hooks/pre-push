@@ -25,7 +25,7 @@ verbose=yes
 if [ X"${verbose}" = X"yes" ]
 then
   printf 'script: %s\n' "${0}"
-  printf 'remote: %s @ %s\n' "${remote}" "${url}"
+  printf 'script: git repo: %s @ %s\n' "${remote}" "${url}"
 fi
 
 
@@ -57,7 +57,7 @@ while read local_ref local_sha remote_ref remote_sha
 do
   if [ X"${verbose}" = X"yes" ]
   then
-    printf 'local_ref: %s [SHA:%s]  remote_ref: %s [SHA:%s]\n' "${local_ref}" "${local_sha}" "${remote_ref}" "${remote_sha}"
+    printf 'script: local_ref: %s [SHA:%s]  remote_ref: %s [SHA:%s]\n' "${local_ref}" "${local_sha}" "${remote_ref}" "${remote_sha}"
   fi
   remote_refs="${remote_refs} ${remote_ref}"
 done
@@ -82,6 +82,10 @@ trap cleanup INT EXIT
 # simulate secure enclave
 sign_invocation() {
 
+  local url="${1}"; shift
+  local name="${1}"; shift
+  local email="${1}"; shift
+
   # user: secret key, public key, and did:key from public key and keyId(always 0 for did:key:)
   local USER_SEC='3LftyxxRPxMFXwVChk14HDybE2VnBnPWaLX31WreZwc8V8xCCuoGL7dcyxnwkFXa8D7CZBwAGWj54yqoaxa7gUne'
   local USER_PUB='CXbgG2vPnd8FWLAZHoLRn3s7PRwehWsoMu6v1HhN9brA'
@@ -91,35 +95,70 @@ sign_invocation() {
   local ISSUER_DID='did:key:z6MkvRsV39xVQc8HevAQwCqEw18DwrEtzVLz8NJY15NtfMmD'
   local CAPABILITY_TARGET="ssh://${url}?key=${ISSUER_DID}"
 
-  local CAPABILITY_URL='cap:one.cap'
+  local capability_list='@@CAPABILITY@@'
+
+  printf 'ENCLAVE: push to git repo: %s\n' "${url}"
+  printf 'ENCLAVE: as user:          %s <%s>\n' "${name}" "${email}"
+  printf 'ENCLAVE: for branches:     %s\n' "${*}"
+
+  local capability
+  local n=0
+  for capability in ${capability_list}
+  do
+    n=$((n + 1))
+    printf 'ENCLAVE: %2d id: %s\n' "${n}" "${capability}"
+    eval local cap_"${n}=\"${capability}\""
+  done
+  read -p 'ENCLAVE: select capability: ' n < /dev/tty
+
+  eval capability=\"\${cap_${n}}\"
+
+  if [ -z "${capability}" ]
+  then
+    printf 'ENCLAVE: rejected all capabilities\n'
+    return 1
+  fi
+
+  printf 'ENCLAVE: using capability: %s\n' "${capability}"
+
+  GetYorN 'ENCLAVE: sign invocation' || return 1
 
   ${sign} \
-    --capability-url="${CAPABILITY_URL}" \
+    --capability-url="${capability}" \
     --target="${CAPABILITY_TARGET}" \
-    --user="${USER_DID"} \
+    --user="${USER_DID}" \
     --user-sec="${USER_SEC}" \
     --user-key="${USER_KID}" > tmp-signed-invocation
+  return $?
 }
 
 if [ -z "${remote_refs}" ]
 then
-  printf 'nothing to push\n'
+  printf 'script: nothing to push\n'
   exit 0
 else
+  name="$(git config --get user.name)"
+  email="$(git config --get user.email)"
 
-  sign_invocation "${url}"
+  if ! sign_invocation "${url}" "${name}" "${email}" ${remote_refs}
+  then
+    printf 'script: signing failed\n'
+    exit 2
+  fi
 
-  target="$(jq .invocationTarget tmp-signed-invocation)"
+  target="$(jq --raw-output .invocationTarget tmp-signed-invocation)"
+
+  printf 'script: target: %s\n' "${target}"
 
   if ! ${invoke} < tmp-signed-invocation \
        --target="${target}" \
        ${remote_refs}
   then
-    printf 'push is forbidden\n'
+    printf 'script: push is forbidden\n'
     exit 1
   fi
 fi
 
-GetYorN 'manually reject push' && exit 1
+GetYorN 'script: manually reject push' && exit 1
 
 exit 0
