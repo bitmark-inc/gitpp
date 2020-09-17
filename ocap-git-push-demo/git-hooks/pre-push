@@ -67,7 +67,7 @@ done
 
 ISSUER_DID='did:key:z6MkvRsV39xVQc8HevAQwCqEw18DwrEtzVLz8NJY15NtfMmD'
 CAPABILITY_URL='cap:one.cap'
-CAPABILITY_TARGET="ssh://${url}?key=${ISSUER_DID#did:key:}"
+CAPABILITY_TARGET="ssh://${url}?key=${ISSUER_DID}"
 
 sign="node --trace-warnings @@JS_DIR@@/sign-invocation.js"
 invoke="node --trace-warnings @@JS_DIR@@/invoke.js"

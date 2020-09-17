@@ -3,14 +3,14 @@
 VERBOSE ?=
 
 # issuer: secret key, public key, and did:key from public key
-ISSUER_SEC = "3Mmk4UzTRJTEtxaKk61LxtgUxAa2Dg36jF6VogPtRiKvfpsQWKPCLesKSV182RMmvMJKk6QErH3wgdHp8itkSSiF"
-ISSUER_PUB = "GycSSui454dpYRKiFdsQ5uaE8Gy3ac6dSMPcAoQsk8yq"
-ISSUER_DID = "did:key:z6MkvRsV39xVQc8HevAQwCqEw18DwrEtzVLz8NJY15NtfMmD"
+ISSUER_SEC = 3Mmk4UzTRJTEtxaKk61LxtgUxAa2Dg36jF6VogPtRiKvfpsQWKPCLesKSV182RMmvMJKk6QErH3wgdHp8itkSSiF
+ISSUER_PUB = GycSSui454dpYRKiFdsQ5uaE8Gy3ac6dSMPcAoQsk8yq
+ISSUER_DID = did:key:z6MkvRsV39xVQc8HevAQwCqEw18DwrEtzVLz8NJY15NtfMmD
 
 # user: secret key, public key, and did:key from public key
-USER_SEC = "3LftyxxRPxMFXwVChk14HDybE2VnBnPWaLX31WreZwc8V8xCCuoGL7dcyxnwkFXa8D7CZBwAGWj54yqoaxa7gUne"
-USER_PUB = "CXbgG2vPnd8FWLAZHoLRn3s7PRwehWsoMu6v1HhN9brA"
-USER_DID = "did:key:z6MkqyrirHAq8Acicq1FyNJGd9R7D1DW7Q8A3v1qqZfP4pdY"
+USER_SEC = 3LftyxxRPxMFXwVChk14HDybE2VnBnPWaLX31WreZwc8V8xCCuoGL7dcyxnwkFXa8D7CZBwAGWj54yqoaxa7gUne
+USER_PUB = CXbgG2vPnd8FWLAZHoLRn3s7PRwehWsoMu6v1HhN9brA
+USER_DID = did:key:z6MkqyrirHAq8Acicq1FyNJGd9R7D1DW7Q8A3v1qqZfP4pdY
 
 
 # all public keys for pub-to-did make target
@@ -35,8 +35,9 @@ GIT_URL ?= git@github.com:bitmark-inc/gitpp.git
 BRANCH_RE ?= ^refs/heads/(feature/trial|main)$$
 
 
-CAPABILITY_URL = 'cap:one.cap'
-CAPABILITY_TARGET = 'ssh://${GIT_URL}?key=z6MkvRsV39xVQc8HevAQwCqEw18DwrEtzVLz8NJY15NtfMmD'
+CAPABILITY_URL = cap:one.cap
+CAPABILITY_FILE = ocaps/one.cap
+CAPABILITY_TARGET = ssh://${GIT_URL}?key=${ISSUER_DID}
 
 # update js dependencies
 .PHONY: all
@@ -48,15 +49,15 @@ all:
 .PHONY: create-capability
 create-capability:
 	node --trace-warnings create-capability.js ${VERBOSE} \
-	  --issuer=${ISSUER_DID} \
-	  --issuer-sec=${ISSUER_SEC} \
+	  --issuer='${ISSUER_DID}' \
+	  --issuer-sec='${ISSUER_SEC}' \
 	  --issuer-key=0 \
-	  --user=${USER_DID} \
+	  --user='${USER_DID}' \
 	  --user-key=0 \
-	  --capability-file='ocaps/one.cap' \
-	  --capability-url=${CAPABILITY_URL} \
-	  --target=${CAPABILITY_TARGET} \
-	  --branch-re="${BRANCH_RE}"
+	  --capability-file='${CAPABILITY_FILE}' \
+	  --capability-url='${CAPABILITY_URL}' \
+	  --target='${CAPABILITY_TARGET}' \
+	  --branch-re='${BRANCH_RE}'
 
 
 # convert the list of public keys to dids and show their did:key:xxx values
@@ -75,14 +76,14 @@ test: test-1 test-2
 test-1:
 	rm -f tmp-signed-invocation
 	node --trace-warnings sign-invocation.js ${VERBOSE} \
-	  --capability-url=${CAPABILITY_URL} \
-	  --target=${CAPABILITY_TARGET} \
-	  --user=${USER_DID} \
-	  --user-sec=${USER_SEC} \
+	  --capability-url='${CAPABILITY_URL}' \
+	  --target='${CAPABILITY_TARGET}' \
+	  --user='${USER_DID}' \
+	  --user-sec='${USER_SEC}' \
 	  --user-key=0 > tmp-signed-invocation
 
 	if node < tmp-signed-invocation --trace-warnings invoke.js ${VERBOSE} \
-	  --target=${CAPABILITY_TARGET} \
+	  --target='${CAPABILITY_TARGET}' \
 	  refs/heads/feature/trial ; \
 	rc="$${?}"; actual=0; \
 	printf '\nexit status: actual: %d  expected: %d\n\n' "$${rc}" "$${actual}" ; \
@@ -95,14 +96,14 @@ test-1:
 test-2:
 	rm -f tmp-signed-invocation
 	node --trace-warnings sign-invocation.js ${VERBOSE} \
-	  --capability-url=${CAPABILITY_URL} \
-	  --target=${CAPABILITY_TARGET} \
-	  --user=${USER_DID} \
-	  --user-sec=${USER_SEC} \
+	  --capability-url='${CAPABILITY_URL}' \
+	  --target='${CAPABILITY_TARGET}' \
+	  --user='${USER_DID}' \
+	  --user-sec='${USER_SEC}' \
 	  --user-key=0 > tmp-signed-invocation
 
 	if node < tmp-signed-invocation --trace-warnings invoke.js ${VERBOSE} \
-	  --target=${CAPABILITY_TARGET} \
+	  --target='${CAPABILITY_TARGET}' \
 	  refs/heads/master ; \
 	rc="$${?}"; actual=1; \
 	printf '\nexit status: actual: %d  expected: %d\n\n' "$${rc}" "$${actual}" ; \

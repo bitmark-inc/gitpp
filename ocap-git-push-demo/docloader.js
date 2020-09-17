@@ -73,7 +73,7 @@ async function documentLoader(url) {
       document: {
         "@context": 'https://w3id.org/security/v2',
         "id": url,
-        "controller": 'did:key:' + key
+        "controller": key
       }
     };
   }
