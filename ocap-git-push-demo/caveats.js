@@ -29,15 +29,20 @@ class BranchCaveat extends Caveat {
    * @param caveat {object} the caveat parameters.
    * @param options.capability {object} the full capability.
    *
-   * @return {Promise<object>} resolves to can object with `valid` and `error`.
+   * @return {Promise<object>} resolves to an object with `valid` and `error`.
    */
   async validate(caveat) {
     try {
-      const regex = RegExp(caveat['git:branchRegExp']['@value']);
-      if (!regex.test(this.branch)) {
-        throw new Error('The capability is not allowed to write to this branch:', this.branch);
+      let allowed = false;
+      const regexData = caveat['git:branchRegExp'];
+      if (Array.isArray(regexData)) {
+        allowed = regexData.reduce((acc, value) => {
+          return acc || RegExp(value['@value']).test(this.branch);
+        }, false);
+      } else {
+        allowed = RegExp(regexData['@value']).test(this.branch);
       }
-      return { valid: true };
+      return { valid: allowed };
     } catch (error) {
       return { valid: false, error };
     }

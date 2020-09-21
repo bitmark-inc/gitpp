@@ -1,4 +1,4 @@
-# BSDmakefile
+# Makefile
 
 VERBOSE ?=
 

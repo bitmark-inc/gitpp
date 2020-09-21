@@ -48,7 +48,7 @@ function usage(message) {
   console.error('       --issuer=URL|DID   -i URL|DID    issuer public key URL');
   console.error('       --issuer-key=N     -j N          issuer public key index [0]');
   console.error('       --issuer-sec=EdB58 -s EdB58      issuer secret key Base58');
-  console.error('       --branch-re=RE     -b RE         regexp for branch restriction');
+  console.error('       --branch-re=RE     -b RE         regexp for branch restriction (multiple)');
   console.error('       --target=URL       -t URL        target of the capability');
   console.error('       --capability=FILE  -c FILE       filename to write delegated capability');
 
@@ -76,7 +76,7 @@ function usage(message) {
   let issuer = '';
   let issuerKeyIndex = 0;
   let issuerSecret = '';
-  let branchRE = '';
+  let branchRE = ''; // single RE string or array of RE strings
   let target = '';
   let capabilityFile = '';
   let capabilityURL = '';
@@ -99,7 +99,17 @@ function usage(message) {
       break;
 
     case 'b':
-      branchRE = option.optarg;
+      if (0 == option.optarg) {
+        usage('branch-re option cannot be empty');
+      }
+      if (Array.isArray(branchRE)) {
+        branchRE.push(option.optarg); // append successive regexps
+      } else if (0 == branchRE.length) {
+        branchRE = option.optarg;
+      } else {
+        // convert single string to array if second option detected
+        branchRE = [branchRE, option.optarg];
+      }
       break;
 
     case 'c':
