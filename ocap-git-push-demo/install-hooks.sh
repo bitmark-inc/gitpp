@@ -43,3 +43,14 @@ do
   sed "s,@@JS_DIR@@,${src_dir},g;s,@@CAPABILITY@@,${capability_list},g" "${s}" > "${d}"
   chmod 755 "${d}"
 done
+
+# check that notes it set to be fetched
+
+
+if git config --get-all remote.origin.fetch | grep -q 'notes'
+then
+  printf 'remote.origin.fetch for notes is already present in .git/config\n'
+else
+  printf 'adding remote.origin.fetch for notes to .git/config\n'
+  git config --add remote.origin.fetch '+refs/notes/*:refs/notes/*'
+fi

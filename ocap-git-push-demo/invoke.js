@@ -43,7 +43,6 @@ function usage(message) {
 
   console.error('       --help             -h            this message');
   console.error('       --verbose          -v            more messages');
-  console.error('       --capability=URL   -c URL        set the delegated capability');
   console.error('       --target=URL       -t URL        target of the capability');
 
   process.exit(2);
@@ -160,10 +159,6 @@ async function runInvocation(invocation, target, branches, verbose) {
     usage('missing required branch argument(s)');
   }
 
-  if (0 == target.length) {
-    usage('missing capability target');
-  }
-
   if (verbose >= 3) {
     debug('3: args:', commandArguments);
   }
@@ -180,6 +175,14 @@ async function runInvocation(invocation, target, branches, verbose) {
   let strInvocation = fs.readFileSync(process.stdin.fd, 'utf8');
 
   const invocation = JSON.parse(strInvocation);
+
+  // if target is not specified get it from the invocation
+  if (0 == target.length) {
+    target = invocation.invocationTarget.toString();
+  }
+  if (0 == target.length) {
+    usage('missing capability target');
+  }
 
   // remaining arguments are the list of branches that are being committed
   const branches = commandArguments;

@@ -28,7 +28,11 @@ then
   printf 'script: git repo: %s @ %s\n' "${remote}" "${url}"
 fi
 
+# internal parameters
+tmp_signed_invocation="$(mktemp tmp-signed-invocation-XXXXXXXX)"
+capability_notes=caps
 
+# accept a yes/no response from /dev/tty
 GetYorN() {
   local yorn junk prompt
 
@@ -51,14 +55,22 @@ GetYorN() {
   return 1
 }
 
+# accumulate all branches and commits hashes for attaching notes
 remote_refs=''
-
+notes_ids=''
 while read local_ref local_sha remote_ref remote_sha
 do
   if [ X"${verbose}" = X"yes" ]
   then
     printf 'script: local_ref: %s [SHA:%s]  remote_ref: %s [SHA:%s]\n' "${local_ref}" "${local_sha}" "${remote_ref}" "${remote_sha}"
   fi
+
+  for rev in $(git rev-list "${local_sha}...${remote_sha}")
+  do
+    printf 'script: object to commit: %s\n' "${rev}"
+    notes_ids="${notes_ids} ${rev}"
+  done
+
   remote_refs="${remote_refs} ${remote_ref}"
 done
 
@@ -72,10 +84,10 @@ invoke="node --trace-warnings @@JS_DIR@@/invoke.js"
 [ X"${debug}" = X"yes" ] && sign="${sign} -v -v" && invoke="${invoke} -v -v"
 
 
-rm -f tmp-signed-invocation
+rm -f "${tmp_signed_invocation}"
 
 cleanup() {
-  rm -f tmp-signed-invocation
+  rm -f "${tmp_signed_invocation}"
 }
 trap cleanup INT EXIT
 
@@ -128,10 +140,11 @@ sign_invocation() {
     --target="${CAPABILITY_TARGET}" \
     --user="${USER_DID}" \
     --user-sec="${USER_SEC}" \
-    --user-key="${USER_KID}" > tmp-signed-invocation
+    --user-key="${USER_KID}" > "${tmp_signed_invocation}"
   return $?
 }
 
+# ask envclave sign then invoke
 if [ -z "${remote_refs}" ]
 then
   printf 'script: nothing to push\n'
@@ -146,19 +159,26 @@ else
     exit 2
   fi
 
-  target="$(jq --raw-output .invocationTarget tmp-signed-invocation)"
-
-  printf 'script: target: %s\n' "${target}"
-
-  if ! ${invoke} < tmp-signed-invocation \
-       --target="${target}" \
-       ${remote_refs}
+  if ! ${invoke} < "${tmp_signed_invocation}" ${remote_refs}
   then
     printf 'script: push is forbidden\n'
     exit 1
   fi
 fi
 
-GetYorN 'script: manually reject push' && exit 1
+# save the signed invocations to the commits notes
+git notes --ref="${capability_notes}" prune
+for rev in ${notes_ids}
+do
+  printf 'script: adding capability note to: %s\n' "${rev}"
+  (
+    printf -- 'Note for %s added by %s <%s>\n' "${rev}" "${name}" "${email}"
+    printf -- '-----BEGIN CAPABILITY-----\n'
+    b64encode -r invocation < "${tmp_signed_invocation}"
+    printf -- '-----END CAPABILITY-----\n'
+  ) | git notes --ref="${capability_notes}" add --force --file -
+done
+
+git push --no-verify origin refs/notes/caps
 
 exit 0
