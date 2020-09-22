@@ -34,9 +34,9 @@ GIT_URL ?= git@github.com:bitmark-inc/gitpp.git
 #   2. no need for $$ as in line below ($$ is only Makefile internal)
 BRANCH_RE ?= ^refs/heads/(feature/trial|main)$$
 
-CAPABILITY_NAME ?= one
-CAPABILITY_URL = cap:${CAPABILITY_NAME}.cap
-CAPABILITY_FILE = ocaps/${CAPABILITY_NAME}.cap
+CAPABILITY_NAME != uuidgen
+CAPABILITY_URL = urn:uuid:${CAPABILITY_NAME}
+CAPABILITY_FILE = ocaps/capabilities.json
 CAPABILITY_TARGET = ssh://${GIT_URL}?key=${ISSUER_DID}
 
 # update js dependencies

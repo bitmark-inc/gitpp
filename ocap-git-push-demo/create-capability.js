@@ -265,7 +265,18 @@ function usage(message) {
     debug('write delegated capability file:', capabilityFile);
   }
 
-  fs.writeFile(capabilityFile, JSON.stringify(signedCapability), 'utf8', (err) => {
+  // read current file
+  const src = fs.readFileSync(capabilityFile, 'utf8');
+  if (0 == src.length) {
+    src = '{}';
+  }
+
+  // add the new item to the map
+  let documents = JSON.parse(src);
+  documents[signedCapability.id] = signedCapability;
+
+  // rewrite file
+  fs.writeFile(capabilityFile, JSON.stringify(documents), 'utf8', (err) => {
     if (err) {
       console.error('file open error', err);
       throw err;

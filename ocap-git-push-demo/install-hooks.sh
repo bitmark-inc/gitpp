@@ -26,21 +26,12 @@ USAGE() {
 hook_dst="${dst_dir}/.git/hooks"
 [ -d "${hook_dst}" ] || USAGE 'the destination repository: %s  is not a git repository' "${dst_dir}"
 
-capability_list=$(ls -1 "${caps_dir}"/*.cap | \
-  while read file
-  do
-    [ ! -f "${file}" ] && continue
-    [ X"${file}" = X"${file%.cap}" ] && continue
-    file="cap:$(basename "${file}")"
-    printf '%s ' "${file}"
-  done)
-
 for s in "${hook_dir}"/*
 do
   bn="$(basename "${s}")"
   d="${hook_dst}/${bn}"
   printf 'installing: %s to: %s\n' "${s}" "${d}"
-  sed "s,@@JS_DIR@@,${src_dir},g;s,@@CAPABILITY@@,${capability_list},g" "${s}" > "${d}"
+  sed "s,@@JS_DIR@@,${src_dir},g" "${s}" > "${d}"
   chmod 755 "${d}"
 done
 

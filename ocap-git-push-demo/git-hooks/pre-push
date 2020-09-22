@@ -104,40 +104,132 @@ sign_invocation() {
   local USER_DID='did:key:z6MkqyrirHAq8Acicq1FyNJGd9R7D1DW7Q8A3v1qqZfP4pdY'
   local USER_KID=0
 
-  local ISSUER_DID='did:key:z6MkvRsV39xVQc8HevAQwCqEw18DwrEtzVLz8NJY15NtfMmD'
-  local CAPABILITY_TARGET="ssh://${url}?key=${ISSUER_DID}"
+  local capability_file="${XDG_CONFIG_HOME}/gitpp/capabilities.json"
+  local capability_alt="${HOME}/.gitpp/capabilities.json"
 
-  local capability_list='@@CAPABILITY@@'
+  if [ -f "${capability_file}" ]
+  then
+    printf 'ENCLAVE: capabilities from: %s\n' "${capability_file}"
+  elif [ -f "${capability_alt}" ]
+  then
+    capability_file="${capability_alt}"
+    printf 'ENCLAVE: capabilities from: %s\n' "${capability_file}"
+  else
+    printf 'ENCLAVE: no capabilities found in: %s\n' "${capability_file}"
+    printf 'ENCLAVE: or in alternate file:     %s\n' "${capability_alt}"
+    return 1
+  fi
 
   printf 'ENCLAVE: push to git repo: %s\n' "${url}"
   printf 'ENCLAVE: as user:          %s <%s>\n' "${name}" "${email}"
   printf 'ENCLAVE: for branches:     %s\n' "${*}"
 
-  local capability
+  local filter='
+    def repo($url): $url |
+      sub("^ssh://git@(?<h>[a-zA-Z.0-9_-]*):(?<a>[^/]*)/(?<r>[^?]*)[?]key=.*$";
+          "\(.h)|\(.a)|\(.r)") |
+      sub("^ssh://(?<p>/.*)/(?<r>[^/?]*)[?]key=.*$";
+          "LOCAL|\(.p)|\(.r)")
+    ;
+
+    def bre($re):
+      [$re] | flatten | reduce .[] as $r (
+        "";
+        . + ($r | gsub("[\\^$]";"") | sub("refs/heads/";"")) + ","
+      ) | sub(",$";"")
+    ;
+
+    def get_branches($caveat):
+      [$caveat] | flatten(1) | reduce .[] as $item (
+        "";
+        if "git:branchCaveat" == $item.type then . + bre($item.branchRegExp) else . end
+      )
+    ;
+
+    # result <id>|some|info|here!TG=<target>!RE=<re>,<re>,…
+    reduce .[] as $item (
+      "";
+      . + $item.id + "|"
+      + repo($item.invocationTarget) + "!TG="
+      + $item.invocationTarget + "!RE="
+      + get_branches($item.caveat)
+      + "\n"
+    )
+  '
+
+  # check for zenity and X11 available
+  local zenity="$(command -v zenity)"
+  [ -x "${zenity}" ] || zenity=''
+  [ -z "${DISPLAY}" ] && zenity=''
+
+  local zenity_args=''
   local n=0
-  for capability in ${capability_list}
+  printf 'ENCLAVE: ----- Choose Capability -----\n'
+  local capability=''
+  for capability in $(jq --raw-output "${filter}" "${capability_file}")
   do
     n=$((n + 1))
-    printf 'ENCLAVE: %2d id: %s\n' "${n}" "${capability}"
     eval local cap_"${n}=\"${capability}\""
+    local id="${capability%%|*}"
+    capability="${capability#*|}"
+    local re="${capability#*!RE=}"
+    capability="${capability%!TG=*}"
+    local info="$(printf '%s' "${capability}" | tr '|' ' ')"
+    if [ -n "${zenity}" ]
+    then
+      zenity_args="${zenity_args} FALSE ${n} ${info} ${re}"
+    else
+      # strip target and add back re for text menu
+      printf 'ENCLAVE: %2d: %s → %s\n' "${n}" "${info}" "${re}"
+    fi
   done
-  read -p 'ENCLAVE: select capability: ' n < /dev/tty
 
-  eval capability=\"\${cap_${n}}\"
+  if [ -n "${zenity}" ]
+  then
+    local w=$((200 + 400))
+    local h=$((n * 14 + 200))
+    n="$(${zenity} \
+           --width="${w}" --height="${h}" \
+           --list --text='Select capability' \
+           --print-column=2 \
+           --hide-column=2 \
+           --radiolist \
+           --column='Select' --column='ID' --column='Host' --column='Account' \
+           --column='Repository' --column='Branches' \
+           ${zenity_args})"
+  else
+    printf 'ENCLAVE: -----------------------------\n'
+    read -p 'ENCLAVE: select capability: ' n < /dev/tty
+  fi
 
-  if [ -z "${capability}" ]
+  eval local r=\"\${cap_${n}}\"
+  local capability_id="${r%%|*}"
+  r="${r#*|}"
+  r="${r%!RE=*}"
+  local capability_target="${r#*!TG=}"
+  r="${r%!TG=*}"
+  local capability_info="$(printf '%s' "${r}" | tr '|' ' ')"
+
+  if [ -z "${capability_id}" ]
   then
     printf 'ENCLAVE: rejected all capabilities\n'
     return 1
   fi
 
-  printf 'ENCLAVE: using capability: %s\n' "${capability}"
-
-  GetYorN 'ENCLAVE: sign invocation' || return 1
+  if [ -n "${zenity}" ]
+  then
+    local d="$(printf '<span font="18"><b>sign invocation using capability:\n\n</b></span><span font="16">to push to: %s\n\n</span><span font="14">( %s )</span>' \
+               "${capability_info}" "${capability_id}")"
+    ${zenity} --width=500 --height=200 --question --text="${d}" --default-cancel || return 1
+  else
+    printf 'ENCLAVE: using capability: %s\n' "${capability_id}"
+    printf 'ENCLAVE:       to push to: %s\n' "${capability_info}"
+    GetYorN 'ENCLAVE: sign invocation' || return 1
+  fi
 
   ${sign} \
-    --capability-url="${capability}" \
-    --target="${CAPABILITY_TARGET}" \
+    --capability-url="${capability_id}" \
+    --target="${capability_target}" \
     --user="${USER_DID}" \
     --user-sec="${USER_SEC}" \
     --user-key="${USER_KID}" > "${tmp_signed_invocation}"

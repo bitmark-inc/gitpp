@@ -49,14 +49,15 @@ async function documentLoader(url) {
     };
   }
 
-  if (0 == url.indexOf('cap:')) {
-    debug('url==cap:', url);
+  if (0 == url.indexOf('urn:')) {
+    debug('url==urn:', url);
     let fileName = url.substring(4, url.length);
-    const s = fs.readFileSync(path.join(filestorePath, fileName), 'utf8');
+    const s = fs.readFileSync(path.join(filestorePath, 'capabilities.json'), 'utf8');
+    const documents = JSON.parse(s);
     return {
       contextUrl: null,
       url: url,
-      document: JSON.parse(s)
+      document: documents[url]
     };
   }
 
