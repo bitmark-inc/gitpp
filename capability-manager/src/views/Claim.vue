@@ -3,7 +3,6 @@
   <p>
     <small class="text-muted">Claim you capability</small>
   </p>
-  <hr />
   <div class="row">
     <div class="col-12">
       <pre class="border">{{ JSON.stringify(signData, null, 2) }}</pre>
@@ -54,7 +53,7 @@ const { PublicKeyProofPurpose } = jsigs.purposes;
 const xhrDocumentLoader = jsonld.documentLoaders.xhr();
 
 import { db } from "../lib/firebase";
-import { ActionCaveat } from "../lib/capability";
+import { BranchCaveat } from "../lib/capability";
 
 const privateKeyBase58 =
   "4KFqAQAtzE2UySaEjkTKGNqxz8dAaWthD6yUeeqQPiFYJgTh5UFNENkksPWooPxL7kPM8NaJ5GfEJdkZRVDgYfjU";
@@ -126,40 +125,44 @@ let sysController;
         return;
       }
 
-      console.log("start signing…");
-
       const snapshot = await db
-        .collection("github-permission-profile")
+        .collection("github-profile")
         .doc(this.githubUsername)
         .collection("repos")
         .get();
 
-      const delegationCaps: any[] = [];
+      const delegationCaps = new Map<string, any>();
 
       snapshot.forEach((doc) => {
         const data = doc.data();
         if (data) {
-          const resourceID = "https://github.com/" + data.name;
+          const resourceID =
+            "ssh://git@github.com:" + data.name + "?key=" + sysController.id;
           const cap = {
-            "@context": "https://w3id.org/security/v2",
+            "@context": [
+              "https://w3id.org/security/v2",
+              "https://capability-manager-demo.web.app/caps/v1/git.jsonld",
+            ],
             id: "urn:uuid:" + uuidV4(),
             parentCapability: resourceID,
             invocationTarget: resourceID,
-            invoker: keyController.id,
+            delegator:
+              "did:key:z6MkqyrirHAq8Acicq1FyNJGd9R7D1DW7Q8A3v1qqZfP4pdY",
+            invoker: "did:key:z6MkqyrirHAq8Acicq1FyNJGd9R7D1DW7Q8A3v1qqZfP4pdY",
           };
-
-          new ActionCaveat({
-            action: data.actions,
+          new BranchCaveat({
+            branchRegExp: data.branchRegExps,
           }).update(cap);
 
-          delegationCaps.push(cap);
+          delegationCaps.set(doc.id, cap);
         }
       });
 
-      const signedCaps: any[] = [];
-      console.log(sysController);
-      for (const cap of delegationCaps) {
+      // const signedCaps: any[] = [];
+      const signedCapsMap = {};
+      for (const [repoID, cap] of delegationCaps) {
         const signedCap = await jsigs.sign(cap, {
+          documentLoader: this.customLoader,
           suite: new Ed25519Signature2018({
             key: new Ed25519KeyPair({
               ...sysController["publicKey"][0],
@@ -170,11 +173,27 @@ let sysController;
             capabilityChain: [cap.invocationTarget],
           }),
         });
-        signedCaps.push(signedCap);
+        // signedCaps.push(signedCap);
+        signedCapsMap[signedCap.id] = signedCap;
+        await db
+          .collection("github-profile")
+          .doc(this.githubUsername)
+          .collection("repos")
+          .doc(repoID)
+          .collection("caps")
+          .doc(signedCap.id)
+          .set({});
+        // add new capability into capabilities collection
+        await db
+          .collection("capabilities")
+          .doc(signedCap.id)
+          .set({
+            ...signedCap,
+            revoked: false,
+          });
       }
 
-      // console.log("Signed capability: ", JSON.stringify(signedCaps, null, 2));
-      this.downloadCaps(JSON.stringify(signedCaps, null, 2));
+      this.downloadCaps(JSON.stringify(signedCapsMap, null, 2));
     },
     async customLoader(url: string) {
       if (url.startsWith("did:key")) {
@@ -184,19 +203,32 @@ let sysController;
           document: didDocument,
           documentUrl: url,
         };
-      } else if (url.startsWith("https://github.com")) {
+      } else if (url.startsWith("ssh:")) {
         try {
-          const r = await axios.head(url);
+          const [repo, qs] = url
+            .replace("ssh://git@github.com:", "")
+            .split("?");
+
+          let key = "";
+          qs.split("&").forEach((s) => {
+            if (s.startsWith("key=")) {
+              key = s.replace("key", "");
+            }
+          });
+
+          const r = await axios.head("https://github.com/" + repo);
           if (r.status === 200) {
-            return {
+            const doc = {
               contextUrl: "https://w3id.org/security/v2", // this is for a context via a link header
               document: {
-                "@id": "https://lemonlatte.github.io/bitmarkd-repo.jsonld",
+                "@id": "https://github.com/" + repo,
                 repository: "https://github.com/bitmark-inc/bitmarkd",
-                controller: sysController.id,
+                controller: key,
               }, // this is the actual document that was loaded
               documentUrl: url, // this is the actual context URL after redirects
             };
+            console.log(doc);
+            return doc;
           }
         } catch (error) {
           console.log(error);
