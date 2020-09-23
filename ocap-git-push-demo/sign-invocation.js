@@ -41,14 +41,14 @@ function usage(message) {
   }
   console.error('usage: %s %s <options>',
 	        process.argv[0], process.argv[1]);
-  console.error('       --help             -h            this message');
-  console.error('       --verbose          -v            more messages');
-  console.error('       --user=URL|DID     -u URL|DID    user public key URL');
-  console.error('       --user-key=N       -k N          user public key index [0]');
-  console.error('       --user-sec=EdB58   -s EdB58      user secret key Base58');
-  console.error('       --capability=URL   -c URL        set the delegated capability');
-  console.error('       --target=URL       -t URL        target of the capability');
-  console.error('       --output-file=FILE -f FILE       file to write signed invocation [stdout]');
+  console.error('       --help                  -h            this message');
+  console.error('       --verbose               -v            more messages');
+  console.error('       --user=URL|DID          -u URL|DID    user public key URL');
+  console.error('       --user-key=N            -k N          user public key index [0]');
+  console.error('       --secrets-file=FILE     -s FILE       files of secret keys');
+  console.error('       --capability=URL        -c URL        set the delegated capability');
+  console.error('       --target=URL            -t URL        target of the capability');
+  console.error('       --output-file=FILE      -f FILE       file to write signed invocation [stdout]');
 
   process.exit(2);
 }
@@ -62,17 +62,43 @@ function usage(message) {
 *
 * @param target {string} target of the capability tree
 *
-* @param keyPair {Ed25519KeyPair} key pair object
+* @param secretsFile {string} file of key pair objects
 *
 * @param userKey {string} URL that corresponds to public key in keyPair
-*        (Note: possible create a did:key:… from keyPair is this is null
 *
 * @param verbose {unsigned int} logging verbosity level (0 = no logging)
 *
 * @result {object} signed capability invocation
 *
 */
-async function signInvocation(capabilityURL, target, keyPair, userKey, verbose) {
+async function signInvocation(capabilityURL, target, secretsFile, userKey, verbose) {
+
+  // read secrets file
+  const secrets = (() => {
+    let src = '{}';
+    try {
+      src = fs.readFileSync(secretsFile, 'utf8');
+      if (0 == src.length) {
+        src = '{}';
+      }
+    } catch (ENOENT) {
+      src = {};
+    }
+
+    return JSON.parse(src);
+  })();
+
+
+  const userSecret = secrets[userKey];
+  if (null == userSecret) {
+    throw new Error('no private key corresonding to: ' + userKey);
+  }
+  // create signing key
+  const keyPair = new Ed25519KeyPair({
+    publicKeyBase58: userSecret.publicKeyBase58,
+    privateKeyBase58: userSecret.privateKeyBase58
+  });
+
 
   const nonce = (+new Date).toString();
 
@@ -122,7 +148,7 @@ async function signInvocation(capabilityURL, target, keyPair, userKey, verbose) 
   let verbose = 0;
   let user = '';
   let userKeyIndex = 0;
-  let userSecret = '';
+  let secretsFile = '';
   let capabilityURL = '';
   let target = '';
   let invocationFile = '';
@@ -132,7 +158,7 @@ async function signInvocation(capabilityURL, target, keyPair, userKey, verbose) 
                                           't:(target)' +
                                           'u:(user)' +
                                           'k:(user-key)' +
-                                          's:(user-sec)' +
+                                          's:(secrets-file)' +
                                           'o:(output-file)' +
                                           'v(verbose)', process.argv);
   let option;
@@ -159,7 +185,7 @@ async function signInvocation(capabilityURL, target, keyPair, userKey, verbose) 
       break;
 
     case 's':
-      userSecret = option.optarg;
+      secretsFile = option.optarg;
       break;
 
     case 'o':
@@ -189,8 +215,8 @@ async function signInvocation(capabilityURL, target, keyPair, userKey, verbose) 
   if (0 == user.length) {
     usage('missing user URL/DID');
   }
-  if (0 == userSecret.length) {
-    usage('missing user secret');
+  if (0 == secretsFile.length) {
+    usage('missing secrets file');
   }
   if (NaN == userKeyIndex) {
     usage('invalid user public key index');
@@ -215,14 +241,8 @@ async function signInvocation(capabilityURL, target, keyPair, userKey, verbose) 
   const userDoc = await documentLoader(user);
   const userInvocationKey = userDoc.document.capabilityInvocation[userKeyIndex];
 
-    // create signing key
-  const userSigningKey = new Ed25519KeyPair({
-    "publicKeyBase58": userDoc.document.publicKey[userKeyIndex].publicKeyBase58,
-    "privateKeyBase58": userSecret
-  });
-
   // sign the document
-  const signedInvocation = await signInvocation(capabilityURL, target, userSigningKey, userDoc.document.capabilityInvocation[0], verbose);
+  const signedInvocation = await signInvocation(capabilityURL, target, secretsFile, userInvocationKey, verbose);
 
   if (verbose >= 1) {
     debug('write signed invocation file:', invocationFile);

@@ -2,19 +2,9 @@
 
 VERBOSE ?=
 
-# issuer: secret key, public key, and did:key from public key
-ISSUER_SEC = 3Mmk4UzTRJTEtxaKk61LxtgUxAa2Dg36jF6VogPtRiKvfpsQWKPCLesKSV182RMmvMJKk6QErH3wgdHp8itkSSiF
-ISSUER_PUB = GycSSui454dpYRKiFdsQ5uaE8Gy3ac6dSMPcAoQsk8yq
+# issuer/user
 ISSUER_DID = did:key:z6MkvRsV39xVQc8HevAQwCqEw18DwrEtzVLz8NJY15NtfMmD
-
-# user: secret key, public key, and did:key from public key
-USER_SEC = 3LftyxxRPxMFXwVChk14HDybE2VnBnPWaLX31WreZwc8V8xCCuoGL7dcyxnwkFXa8D7CZBwAGWj54yqoaxa7gUne
-USER_PUB = CXbgG2vPnd8FWLAZHoLRn3s7PRwehWsoMu6v1HhN9brA
 USER_DID = did:key:z6MkqyrirHAq8Acicq1FyNJGd9R7D1DW7Q8A3v1qqZfP4pdY
-
-
-# all public keys for pub-to-did make target
-PUBLIC_KEYS = ${ISSUER_PUB} ${USER_PUB}
 
 # default URL is this repository
 GIT_URL ?= git@github.com:bitmark-inc/gitpp.git
@@ -39,6 +29,9 @@ CAPABILITY_URL = urn:uuid:${CAPABILITY_NAME}
 CAPABILITY_FILE = ocaps/capabilities.json
 CAPABILITY_TARGET = ssh://${GIT_URL}?key=${ISSUER_DID}
 
+SECRETS_FILE = ./demo-secrets.json
+NEW_SECRETS_FILE = ocaps/secrets.json
+
 # update js dependencies
 .PHONY: all
 all:
@@ -50,20 +43,21 @@ all:
 create-capability:
 	node --trace-warnings create-capability.js ${VERBOSE} \
 	  --issuer='${ISSUER_DID}' \
-	  --issuer-sec='${ISSUER_SEC}' \
 	  --issuer-key=0 \
 	  --user='${USER_DID}' \
 	  --user-key=0 \
 	  --capability-file='${CAPABILITY_FILE}' \
 	  --capability-url='${CAPABILITY_URL}' \
+	  --secrets-file='${SECRETS_FILE}' \
 	  --target='${CAPABILITY_TARGET}' \
 	  --branch-re='${BRANCH_RE}'
 
+# create a fresh key
+.PHONY: new-secret
+new-secret:
+	node --trace-warnings new-secret.js ${VERBOSE} \
+	  --secrets-file='${NEW_SECRETS_FILE}'
 
-# convert the list of public keys to dids and show their did:key:xxx values
-.PHONY: pub-to-did
-pub-to-did:
-	node --trace-warnings getdid.js ${VERBOSE} ${PUBLIC_KEYS}
 
 
 # run all tests
@@ -79,7 +73,7 @@ test-1:
 	  --capability-url='${CAPABILITY_URL}' \
 	  --target='${CAPABILITY_TARGET}' \
 	  --user='${USER_DID}' \
-	  --user-sec='${USER_SEC}' \
+	  --secrets-file='${SECRETS_FILE}' \
 	  --user-key=0 > tmp-signed-invocation
 
 	if node < tmp-signed-invocation --trace-warnings invoke.js ${VERBOSE} \
@@ -99,7 +93,7 @@ test-2:
 	  --capability-url='${CAPABILITY_URL}' \
 	  --target='${CAPABILITY_TARGET}' \
 	  --user='${USER_DID}' \
-	  --user-sec='${USER_SEC}' \
+	  --secrets-file='${SECRETS_FILE}' \
 	  --user-key=0 > tmp-signed-invocation
 
 	if node < tmp-signed-invocation --trace-warnings invoke.js ${VERBOSE} \

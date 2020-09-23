@@ -98,27 +98,35 @@ sign_invocation() {
   local name="${1}"; shift
   local email="${1}"; shift
 
-  # user: secret key, public key, and did:key from public key and keyId(always 0 for did:key:)
-  local USER_SEC='3LftyxxRPxMFXwVChk14HDybE2VnBnPWaLX31WreZwc8V8xCCuoGL7dcyxnwkFXa8D7CZBwAGWj54yqoaxa7gUne'
-  local USER_PUB='CXbgG2vPnd8FWLAZHoLRn3s7PRwehWsoMu6v1HhN9brA'
+  # user's did:key and keyId(always 0 for did:key:)
   local USER_DID='did:key:z6MkqyrirHAq8Acicq1FyNJGd9R7D1DW7Q8A3v1qqZfP4pdY'
   local USER_KID=0
+
+  local secrets_file="${XDG_CONFIG_HOME}/gitpp/secrets.json"
+  local secrets_alt="${HOME}/.gitpp/secrets.json"
 
   local capability_file="${XDG_CONFIG_HOME}/gitpp/capabilities.json"
   local capability_alt="${HOME}/.gitpp/capabilities.json"
 
-  if [ -f "${capability_file}" ]
-  then
-    printf 'ENCLAVE: capabilities from: %s\n' "${capability_file}"
-  elif [ -f "${capability_alt}" ]
-  then
-    capability_file="${capability_alt}"
-    printf 'ENCLAVE: capabilities from: %s\n' "${capability_file}"
-  else
-    printf 'ENCLAVE: no capabilities found in: %s\n' "${capability_file}"
-    printf 'ENCLAVE: or in alternate file:     %s\n' "${capability_alt}"
-    return 1
-  fi
+  local item
+  for item in secrets capability
+  do
+    eval local file=\"\${${item}_file}\"
+    eval local alt=\"\${${item}_alt}\"
+    if [ -f "${file}" ]
+    then
+      printf 'ENCLAVE: cannot load %s from: %s\n' "${item}" "${file}"
+    elif [ -f "${alt}" ]
+    then
+      file="${alt}"
+      eval "${item}_file=\"${alt}\""
+      printf 'ENCLAVE: %s from: %s\n' "${item}" "${file}"
+    else
+      printf 'ENCLAVE: no %s found in: %s\n' "${item}" "${file}"
+      printf 'ENCLAVE: or in alternate file: %s\n' "${alt}"
+      return 1
+    fi
+  done
 
   printf 'ENCLAVE: push to git repo: %s\n' "${url}"
   printf 'ENCLAVE: as user:          %s <%s>\n' "${name}" "${email}"
@@ -230,8 +238,8 @@ sign_invocation() {
   ${sign} \
     --capability-url="${capability_id}" \
     --target="${capability_target}" \
+    --secrets-file="${secrets_file}" \
     --user="${USER_DID}" \
-    --user-sec="${USER_SEC}" \
     --user-key="${USER_KID}" > "${tmp_signed_invocation}"
   return $?
 }

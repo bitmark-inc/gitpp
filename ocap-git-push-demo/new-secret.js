@@ -1,17 +1,8 @@
 'use strict';
 
-const jsonld = require('jsonld');
-const { KeyPairOptions } = require('crypto-ld');
+const fs = require('fs');
 
-const jsigs = require('jsonld-signatures');
-const { Ed25519KeyPair, SECURITY_CONTEXT_V2_URL, suites } = jsigs;
-const { Ed25519Signature2018 } = suites;
-
-const ocapld = require('ocapld');
-const { CapabilityInvocation, ExpirationCaveat } = ocapld;
-
-const { BranchCaveat } = require("./caveats");
-
+const { KeyPairOptions, Ed25519KeyPair} = require('crypto-ld');
 
 const keyDriver = require('did-method-key');
 const {keyToDidDoc} = keyDriver.driver();
@@ -45,6 +36,7 @@ function usage(message) {
   console.error('       --help                  -h            this message');
   console.error('       --verbose               -v            more messages');
   console.error('       --full-did              -f            output full did instead of ids');
+  console.error('       --secrets-file=FILE     -s FILE       add the secret to this JSON map');
 
   process.exit(2);
 }
@@ -64,8 +56,9 @@ function usage(message) {
 
   let verbose = 0;
   let full_did = false;
+  let userSecretsFile = '';
 
-  let parser = new mod_getopt.BasicParser('h(help)f(full-did)v(verbose)', process.argv);
+  let parser = new mod_getopt.BasicParser('h(help)f(full-did)s:(secrets-file)v(verbose)', process.argv);
   let option;
   while ((option = parser.getopt()) !== undefined) {
     switch (option.option) {
@@ -75,6 +68,10 @@ function usage(message) {
 
     case 'f':
       full_did = true;
+      break;
+
+    case 's':
+      userSecretsFile = option.optarg;
       break;
 
     case 'h':
@@ -93,39 +90,48 @@ function usage(message) {
   // strip script name and already processed options from command arguments
   // leaving just a list of branches
   const commandArguments = process.argv.slice(parser.optind());
-  if (0 == commandArguments.length) {
-    usage('missing required public key arguments argument(s)');
+  if (0 != commandArguments.length) {
+    usage('extraneous extra argument(s)');
+  }
+  if (0 == userSecretsFile.length) {
+    usage('missing secrets file');
   }
 
-  if (verbose >= 3) {
-    debug('3: args:', commandArguments);
+  const keyPair = await Ed25519KeyPair.generate();
+
+  const did = keyToDidDoc(keyPair);
+
+  if (full_did) {
+    console.log('did:', JSON.stringify(did, null, 2));
   }
 
+  const keyId = did.id + "#" + did.id.replace(/^did:key:/, '');
 
-  let results = commandArguments.map(
-    (publicKey) => {
+  if (verbose >= 1) {
+    debug('write secrets file:', userSecretsFile);
+  }
 
-      debug('public key:', publicKey);
-      const myPk = {
-        "publicKeyBase58": publicKey,
-        "privateKeyBase58": ""
-      };
+  // read secrets file
+  let src = '{}';
+  try {
+    src = fs.readFileSync(userSecretsFile, 'utf8');
+    if (0 == src.length) {
+      src = '{}';
+    }
+  } catch (ENOENT) {
+    src = '{}';
+  }
 
-      const myKeyPair = new Ed25519KeyPair(myPk);
+  // add the new item to the map
+  let documents = JSON.parse(src);
+  documents[keyId] = keyPair;
 
-      const did = keyToDidDoc(myKeyPair);
-      //debug('=====> did:', JSON.stringify(did, null, 2));
+  // rewrite file
+  fs.writeFile(userSecretsFile, JSON.stringify(documents), 'utf8', (err) => {
+    if (err) {
+      console.error('file open error', err);
+      throw err;
+    }
+  });
 
-      if (full_did) {
-        return did;
-      } else {
-        return {
-          id: did.id,
-          pubLicKeyBase58: publicKey
-        };
-      }
-    });
-
-  // output results to stdout
-  console.log(JSON.stringify(results, null, 2));
 })();

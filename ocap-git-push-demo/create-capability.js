@@ -41,16 +41,17 @@ function usage(message) {
   console.error('usage: %s %s <options>',
 	        process.argv[0], process.argv[1]);
 
-  console.error('       --help             -h            this message');
-  console.error('       --verbose          -v            more messages');
-  console.error('       --user=URL|DID     -u URL|DID    user URL or did:key:');
-  console.error('       --user-key=N       -k N          user public key index [0]');
-  console.error('       --issuer=URL|DID   -i URL|DID    issuer public key URL');
-  console.error('       --issuer-key=N     -j N          issuer public key index [0]');
-  console.error('       --issuer-sec=EdB58 -s EdB58      issuer secret key Base58');
-  console.error('       --branch-re=RE     -b RE         regexp for branch restriction (multiple)');
-  console.error('       --target=URL       -t URL        target of the capability');
-  console.error('       --capability=FILE  -c FILE       filename to write delegated capability');
+  console.error('       --help                  -h            this message');
+  console.error('       --verbose               -v            more messages');
+  console.error('       --user=URL|DID          -u URL|DID    user URL or did:key:');
+  console.error('       --user-key=N            -k N          user public key index [0]');
+  console.error('       --issuer=URL|DID        -i URL|DID    issuer public key URL');
+  console.error('       --issuer-key=N          -j N          issuer public key index [0]');
+  console.error('       --secrets-file=FILE     -s FILE       file of secret keys');
+  console.error('       --branch-re=RE          -b RE         regexp for branch restriction (multiple)');
+  console.error('       --target=URL            -t URL        target of the capability');
+  console.error('       --capability-url=URL    -C URL        URL of the capability');
+  console.error('       --capability-file=FILE  -c FILE       filename to write delegated capability');
 
   process.exit(2);
 }
@@ -75,7 +76,7 @@ function usage(message) {
   let userKeyIndex = 0;
   let issuer = '';
   let issuerKeyIndex = 0;
-  let issuerSecret = '';
+  let secretsFile = '';
   let branchRE = ''; // single RE string or array of RE strings
   let target = '';
   let capabilityFile = '';
@@ -87,7 +88,7 @@ function usage(message) {
                                           'C:(capability-url)' +
                                           'i:(issuer)' +
                                           'j:(issuer-key)' +
-                                          's:(issuer-sec)' +
+                                          's:(secrets-file)' +
                                           'k:(user-key)' +                                          'u:(user)' +
                                           't:(target)' +
                                           'v(verbose)', process.argv);
@@ -129,7 +130,7 @@ function usage(message) {
       break;
 
     case 's':
-      issuerSecret  = option.optarg;
+      secretsFile  = option.optarg;
       break;
 
 
@@ -177,9 +178,6 @@ function usage(message) {
   if (0 == issuer.length) {
     usage('missing issuer URL/DID');
   }
-  if (0 == issuerSecret.length) {
-    usage('missing issuer secret');
-  }
   if (NaN == issuerKeyIndex) {
     usage('invalid issuer public key index');
   }
@@ -189,6 +187,9 @@ function usage(message) {
   if (NaN == userKeyIndex) {
     usage('invalid user key index');
   }
+  if (0 == secretsFile.length) {
+    usage('missing issuer secret');
+  }
   if (0 == target.length) {
     usage('missing target URL/ID');
   }
@@ -196,7 +197,6 @@ function usage(message) {
   if (verbose >= 3) {
     debug('branch-re:', branchRE);
   }
-
 
   // resolve issuer and user to documents
 
@@ -206,12 +206,34 @@ function usage(message) {
   const userDoc = await documentLoader(user);
   const userInvocationKey = userDoc.document.capabilityInvocation[userKeyIndex];
 
+  // read secrets file
+  const secrets = (() => {
+    let src = '{}';
+    try {
+      src = fs.readFileSync(secretsFile, 'utf8');
+      if (0 == src.length) {
+        src = '{}';
+      }
+    } catch (ENOENT) {
+      src = {};
+    }
+
+    return JSON.parse(src);
+  })();
 
   // create signing key
+  const issuerSecret = secrets[issuerDoc.document.publicKey[issuerKeyIndex].id];
+  if (null == issuerSecret) {
+    throw new Error('no private key corresonding to: ' + JSON.stringify(issuerDoc.document.publicKey[issuerKeyIndex]));
+  }
   const issuerSigningKey = new Ed25519KeyPair({
-    "publicKeyBase58": issuerDoc.document.publicKey[issuerKeyIndex].publicKeyBase58,
-    "privateKeyBase58": issuerSecret
+    publicKeyBase58: issuerSecret.publicKeyBase58,
+    privateKeyBase58: issuerSecret.privateKeyBase58
   });
+  if (verbose >= 3) {
+    debug('issuerSigningKey', issuerSigningKey);
+    debug('issuerDelecationKey', issuerDelegationKey);
+  }
 
 
   const capability = {

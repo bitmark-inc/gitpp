@@ -41,9 +41,9 @@ function usage(message) {
   console.error('usage: %s %s <options> branch-spec…',
 	        process.argv[0], process.argv[1]);
 
-  console.error('       --help             -h            this message');
-  console.error('       --verbose          -v            more messages');
-  console.error('       --target=URL       -t URL        target of the capability');
+  console.error('       --help                  -h            this message');
+  console.error('       --verbose               -v            more messages');
+  console.error('       --target=URL            -t URL        target of the capability');
 
   process.exit(2);
 }
