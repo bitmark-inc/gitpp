@@ -115,12 +115,12 @@ sign_invocation() {
     eval local alt=\"\${${item}_alt}\"
     if [ -f "${file}" ]
     then
-      printf 'ENCLAVE: cannot load %s from: %s\n' "${item}" "${file}"
+      printf 'ENCLAVE: load %s from: %s\n' "${item}" "${file}"
     elif [ -f "${alt}" ]
     then
       file="${alt}"
       eval "${item}_file=\"${alt}\""
-      printf 'ENCLAVE: %s from: %s\n' "${item}" "${file}"
+      printf 'ENCLAVE: load %s from: %s\n' "${item}" "${file}"
     else
       printf 'ENCLAVE: no %s found in: %s\n' "${item}" "${file}"
       printf 'ENCLAVE: or in alternate file: %s\n' "${alt}"
@@ -276,9 +276,8 @@ do
     printf -- '-----BEGIN CAPABILITY-----\n'
     b64encode -r invocation < "${tmp_signed_invocation}"
     printf -- '-----END CAPABILITY-----\n'
-  ) | git notes --ref="${capability_notes}" add --force --file -
+  ) | git notes --ref="${capability_notes}" add --force --file - "${rev}"
 done
-
 git push --no-verify origin refs/notes/caps
 
 exit 0
