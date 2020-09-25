@@ -6,7 +6,9 @@
   <div class="row">
     <div class="col-12">
       <pre class="border">{{ JSON.stringify(signData, null, 2) }}</pre>
-      <button type="button" class="btn btn-primary" @click="refresh">Refresh</button>
+      <button type="button" class="btn btn-primary" @click="refresh">
+        Refresh
+      </button>
     </div>
   </div>
   <hr />
@@ -15,7 +17,12 @@
       <form>
         <div class="form-group">
           <label for="user-did">DID Document</label>
-          <textarea class="form-control" id="user-did" rows="10" v-model="did"></textarea>
+          <textarea
+            class="form-control"
+            id="user-did"
+            rows="10"
+            v-model="did"
+          ></textarea>
         </div>
       </form>
     </div>
@@ -23,14 +30,21 @@
       <form>
         <div class="form-group">
           <label for="user-did">DID Signature</label>
-          <textarea class="form-control" id="user-did" rows="10" v-model="signature"></textarea>
+          <textarea
+            class="form-control"
+            id="user-did"
+            rows="10"
+            v-model="signature"
+          ></textarea>
         </div>
       </form>
     </div>
   </div>
   <div class="row">
     <div class="col-12">
-      <button type="button" class="btn btn-primary" @click="claim">Claim</button>
+      <button type="button" class="btn btn-primary" @click="claim">
+        Claim
+      </button>
     </div>
   </div>
 </template>
@@ -55,29 +69,6 @@ const xhrDocumentLoader = jsonld.documentLoaders.xhr();
 import { db } from "../lib/firebase";
 import { BranchCaveat } from "../lib/capability";
 
-const privateKeyBase58 =
-  "4KFqAQAtzE2UySaEjkTKGNqxz8dAaWthD6yUeeqQPiFYJgTh5UFNENkksPWooPxL7kPM8NaJ5GfEJdkZRVDgYfjU";
-const publicKeyBase58 = "25VanJqXPwpDzzqTai7U2PiDRmMZhsKiS32WrFsP7x2z";
-
-const sysPublicKey = {
-  "@context": jsigs.SECURITY_CONTEXT_URL,
-  type: "Ed25519VerificationKey2018",
-  id: "did:bitmark:e4CHPviKRu5P6L5YQ15qYL77tfXEGua4U4maPTmzf4YwxCMA9d#key-1",
-  controller: "did:bitmark:e4CHPviKRu5P6L5YQ15qYL77tfXEGua4U4maPTmzf4YwxCMA9d",
-  publicKeyBase58,
-};
-
-let sysController;
-
-(async function init() {
-  const edKey = new Ed25519KeyPair({
-    ...sysPublicKey,
-    privateKeyBase58,
-  });
-
-  sysController = didDriver().keyToDidDoc(edKey);
-})();
-
 @Options({
   methods: {
     downloadCaps(text: string) {
@@ -96,104 +87,36 @@ let sysController;
     },
 
     async claim() {
-      let signature;
+      let keyController, signature;
       try {
+        keyController = JSON.parse(this.did);
         signature = JSON.parse(this.signature);
       } catch (error) {
-        console.log("invalid JSON");
+        alert("invalid JSON");
         return;
       }
 
       if (signature.nonce !== this.signData["nonce"]) {
-        console.log("invalid timestamp");
+        alert("invalid timestamp");
         return;
       }
 
-      const keyController = JSON.parse(this.did);
+      try {
+        const apiToken = await this.user.getIdToken();
+        const res = await axios.post(
+          "https://caps.test.bitmark.com/claim",
+          { did: keyController, signature: signature },
+          { headers: { Authorization: "Bearer " + apiToken } }
+        );
 
-      const result = await jsigs.verify(signature, {
-        documentLoader: this.customLoader,
-        suite: new Ed25519Signature2018(),
-        purpose: new PublicKeyProofPurpose({
-          controller: keyController,
-          // date: new Date(parseInt(signature.nonce)), // set date to the time a doc is created
-          // maxTimestampDelta: 10,
-        }),
-      });
-      if (!result.verified) {
-        console.log("invalid signature", result);
-        return;
-      }
-
-      const snapshot = await db
-        .collection("github-profile")
-        .doc(this.githubUsername)
-        .collection("repos")
-        .get();
-
-      const delegationCaps = new Map<string, any>();
-
-      snapshot.forEach((doc) => {
-        const data = doc.data();
-        if (data) {
-          const resourceID =
-            "ssh://git@github.com:" + data.name + "?key=" + sysController.id;
-          const cap = {
-            "@context": [
-              "https://w3id.org/security/v2",
-              "https://capability-manager-demo.web.app/caps/v1/git.jsonld",
-            ],
-            id: "urn:uuid:" + uuidV4(),
-            parentCapability: resourceID,
-            invocationTarget: resourceID,
-            delegator:
-              "did:key:z6MkqyrirHAq8Acicq1FyNJGd9R7D1DW7Q8A3v1qqZfP4pdY",
-            invoker: "did:key:z6MkqyrirHAq8Acicq1FyNJGd9R7D1DW7Q8A3v1qqZfP4pdY",
-          };
-          new BranchCaveat({
-            branchRegExp: data.branchRegExps,
-          }).update(cap);
-
-          delegationCaps.set(doc.id, cap);
+        this.downloadCaps(JSON.stringify(res.data, null, 2));
+      } catch (error) {
+        if (error.response) {
+          alert(error.response.data.name);
+        } else {
+          alert(error.message);
         }
-      });
-
-      // const signedCaps: any[] = [];
-      const signedCapsMap = {};
-      for (const [repoID, cap] of delegationCaps) {
-        const signedCap = await jsigs.sign(cap, {
-          documentLoader: this.customLoader,
-          suite: new Ed25519Signature2018({
-            key: new Ed25519KeyPair({
-              ...sysController["publicKey"][0],
-              privateKeyBase58,
-            }),
-          }),
-          purpose: new CapabilityDelegation({
-            capabilityChain: [cap.invocationTarget],
-          }),
-        });
-        // signedCaps.push(signedCap);
-        signedCapsMap[signedCap.id] = signedCap;
-        await db
-          .collection("github-profile")
-          .doc(this.githubUsername)
-          .collection("repos")
-          .doc(repoID)
-          .collection("caps")
-          .doc(signedCap.id)
-          .set({});
-        // add new capability into capabilities collection
-        await db
-          .collection("capabilities")
-          .doc(signedCap.id)
-          .set({
-            ...signedCap,
-            revoked: false,
-          });
       }
-
-      this.downloadCaps(JSON.stringify(signedCapsMap, null, 2));
     },
     async customLoader(url: string) {
       if (url.startsWith("did:key")) {
