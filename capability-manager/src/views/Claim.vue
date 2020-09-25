@@ -164,6 +164,7 @@ import { BranchCaveat } from "../lib/capability";
 
   props: {
     user: Object as () => firebase.User,
+    isAdmin: Boolean,
     githubUsername: String,
     githubToken: String,
   },
@@ -175,7 +176,7 @@ import { BranchCaveat } from "../lib/capability";
         nonce: "1600062484004",
       },
       did: ``,
-      signature: "{}",
+      signature: ``,
     };
   },
 })

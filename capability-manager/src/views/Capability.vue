@@ -13,23 +13,30 @@
           role="tab"
           aria-controls="repo"
           @click="switchTab('repo')"
-        >Repository</a>
+          >Repository</a
+        >
       </li>
-      <li class="nav-item" role="presentation">
+      <li v-if="isAdmin" class="nav-item" role="presentation">
         <a
           class="nav-link"
           data-toggle="tab"
           role="tab"
           aria-controls="cap"
           @click="switchTab('cap')"
-        >Capability</a>
+          >Capability</a
+        >
       </li>
     </ul>
 
     <div class="tab-content" id="myTabContent">
       <p></p>
-      <RepoSelection v-if="tab == 'repo'" :githubToken="githubToken" />
-      <CapabilityList v-if="tab == 'cap'" />
+      <RepoSelection
+        v-if="tab == 'repo'"
+        :isAdmin="isAdmin"
+        :githubToken="githubToken"
+        :githubUsername="githubUsername"
+      />
+      <CapabilityList v-if="tab == 'cap'" :isAdmin="isAdmin" />
     </div>
   </div>
 </template>
@@ -52,6 +59,8 @@ import CapabilityList from "../components/CapabilityList.vue";
   },
 
   props: {
+    isAdmin: Boolean,
+    githubUsername: String,
     githubToken: String,
   },
 

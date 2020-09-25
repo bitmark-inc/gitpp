@@ -4,17 +4,25 @@
     <div id="user-pick" class="row">
       <div class="col-12">
         <form @submit.prevent="checkUsername">
-          <div class="input-group" :class="{'is-invalid': !isUsernameValid }">
+          <div class="input-group" :class="{ 'is-invalid': !isUsernameValid }">
             <input
               type="text"
               class="form-control"
-              :class="{'is-invalid': !isUsernameValid }"
+              :class="{ 'is-invalid': !isUsernameValid }"
               id="staticUsername"
               v-model="username"
+              :disabled="!isAdmin"
               placeholder="Github Username"
             />
             <div class="input-group-append">
-              <button class="btn btn-outline-primary" type="button" @click="checkUsername">Check</button>
+              <button
+                class="btn btn-outline-primary"
+                type="button"
+                :disabled="!isAdmin"
+                @click="checkUsername"
+              >
+                Check
+              </button>
             </div>
           </div>
           <div class="invalid-feedback">Invalid username in Github</div>
@@ -30,11 +38,12 @@
             <div class="card">
               <div class="card-header text-center">
                 <h5 class="my-0">
-                  {{repo.name}}
+                  {{ repo.name }}
                   <button
                     type="button"
                     class="close"
                     aria-label="Close"
+                    v-if="isAdmin"
                     @click="deleteRepo(id)"
                   >
                     <span aria-hidden="true">&times;</span>
@@ -46,7 +55,9 @@
                   <dt class="col-4">Roles</dt>
                   <dd class="col-8">{{ repo.roles.join(", ") }}</dd>
                   <dt v-if="repo.branchRegExps" class="col-4">Branches</dt>
-                  <dd v-if="repo.branchRegExps" class="col-8">{{ repo.branchRegExps.join(", ") }}</dd>
+                  <dd v-if="repo.branchRegExps" class="col-8">
+                    {{ repo.branchRegExps.join(", ") }}
+                  </dd>
                 </dl>
               </div>
             </div>
@@ -56,7 +67,7 @@
       </div>
     </div>
     <p></p>
-    <div class="add" v-if="profile">
+    <div class="add" v-if="isAdmin && profile">
       <h3>Grant new repository</h3>
 
       <div id="repo-pick" class="row">
@@ -66,9 +77,19 @@
             <div class="form-group row">
               <div class="col-12">
                 <div class="input-group">
-                  <select class="form-control" v-model="selectedRepo" id="repoSelect">
+                  <select
+                    class="form-control"
+                    v-model="selectedRepo"
+                    id="repoSelect"
+                  >
                     <option value selected>Select a repository...</option>
-                    <option :value="name" v-for="name in repos" v-bind:key="name">{{ name }}</option>
+                    <option
+                      :value="name"
+                      v-for="name in repos"
+                      v-bind:key="name"
+                    >
+                      {{ name }}
+                    </option>
                   </select>
                 </div>
               </div>
@@ -84,9 +105,20 @@
             <div class="form-group row">
               <div class="col-12">
                 <div class="input-group">
-                  <select multiple class="form-control" v-model="selectedRoles" id="roleSelect">
+                  <select
+                    multiple
+                    class="form-control"
+                    v-model="selectedRoles"
+                    id="roleSelect"
+                  >
                     <option value disabled>Select roles...</option>
-                    <option :value="role" v-for="role in roles" v-bind:key="role.id">{{ role.name }}</option>
+                    <option
+                      :value="role"
+                      v-for="role in roles"
+                      v-bind:key="role.id"
+                    >
+                      {{ role.name }}
+                    </option>
                   </select>
                 </div>
               </div>
@@ -95,17 +127,25 @@
         </div>
       </div>
 
-      <div id="show-capabiliy" class="row" v-if="selectedRepo && selectedRoles.length">
+      <div
+        id="show-capabiliy"
+        class="row"
+        v-if="selectedRepo && selectedRoles.length"
+      >
         <div class="col-12">
           <h4>Capabilities</h4>
         </div>
         <div class="col-12">
           <ul>
-            <li v-for="role in selectedRoles" :key="role.id">{{ role.branchRegExp }}</li>
+            <li v-for="role in selectedRoles" :key="role.id">
+              {{ role.branchRegExp }}
+            </li>
           </ul>
         </div>
         <div class="col-12">
-          <button type="button" class="btn btn-primary" @click="saveCapability">Add</button>
+          <button type="button" class="btn btn-primary" @click="saveCapability">
+            Add
+          </button>
         </div>
       </div>
     </div>
@@ -166,6 +206,9 @@ const roles: Array<Role> = [
     //     }
     //   }
     // }
+    this.username = this.githubUsername;
+    this.watchProfile(this.username);
+
     if (this.githubToken) {
       try {
         const r = await axios.get(
@@ -216,7 +259,7 @@ const roles: Array<Role> = [
               repos.set(doc.id, data);
             }
           });
-          this.profile.repos = repos;
+          this.profile = { repos: repos };
         });
     },
 
@@ -316,6 +359,8 @@ const roles: Array<Role> = [
   },
 
   props: {
+    isAdmin: Boolean,
+    githubUsername: String,
     githubToken: String,
   },
 

@@ -2,7 +2,7 @@
   <div class="home">
     <nav
       class="navbar navbar-expand-lg navbar-light justify-content-between"
-      style="background-color: #e3f2fd;"
+      style="background-color: #e3f2fd"
     >
       <a class="navbar-brand" href="#">Capability Management Demo</a>
       <button
@@ -20,13 +20,19 @@
         <ul class="navbar-nav mr-auto">
           <li class="nav-item">
             <router-link
-              :to="{ name: 'Capability'}"
+              :to="{ name: 'Capability' }"
               active-class="active"
               class="nav-link"
-            >Capabilities</router-link>
+              >Capabilities</router-link
+            >
           </li>
           <li class="nav-item">
-            <router-link :to="{ name: 'Claim'}" active-class="active" class="nav-link">Claim</router-link>
+            <router-link
+              :to="{ name: 'Claim' }"
+              active-class="active"
+              class="nav-link"
+              >Claim</router-link
+            >
           </li>
         </ul>
         <form class="form-inline">
@@ -40,15 +46,24 @@
               v-model="email"
             />
           </div>
-          <button class="btn btn-outline-success" @click="logout">Logout</button>
+          <button class="btn btn-outline-success" @click="logout">
+            Logout
+          </button>
         </form>
       </div>
     </nav>
-    <p style="text-align: center;">
-      <small class="text-muted">This site is for demo. Not to use it in production.</small>
+    <p style="text-align: center">
+      <small class="text-muted"
+        >This site is for demo. Not to use it in production.</small
+      >
     </p>
     <div class="container" v-if="user">
-      <router-view :user="user" :githubToken="githubToken" :githubUsername="githubUsername" />
+      <router-view
+        :user="user"
+        :isAdmin="isAdmin"
+        :githubToken="githubToken"
+        :githubUsername="githubUsername"
+      />
     </div>
   </div>
 </template>
@@ -85,6 +100,7 @@ import { db, auth, getCurrentUser } from "../lib/firebase";
       if (!data) {
         throw new Error("can not get user info");
       }
+      this.isAdmin = data.isAdmin;
       this.githubToken = data.github.accessToken;
       this.githubUsername = data.github.username;
       this.user = user;
@@ -94,6 +110,7 @@ import { db, auth, getCurrentUser } from "../lib/firebase";
 
   data() {
     return {
+      isAdmin: false,
       githubUsername: "",
       githubToken: "",
       user: null,
